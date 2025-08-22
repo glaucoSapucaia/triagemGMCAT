@@ -1,39 +1,184 @@
 import logging
 import time
-from selenium import webdriver
+import os
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
+
+logger = logging.getLogger(__name__)
 
 
-def urbano_auto(credenciais, indice, pasta_indice):
-    try:
-        logging.info(f"Acessando Sistema 2 para índice {indice}")
-        driver = webdriver.Chrome()
-        driver.get("https://sistema2.exemplo.com")
+class UrbanoAuto:
+    def __init__(self, driver, url, usuario, senha, pasta_download):
+        self.driver = driver
+        self.url = url
+        self.usuario = usuario
+        self.senha = senha
+        self.pasta_download = pasta_download
+        self.wait = WebDriverWait(self.driver, timeout=5)
 
-        # Login
-        driver.find_element(By.ID, "usuario").send_keys(credenciais["usuario"])
-        driver.find_element(By.ID, "senha").send_keys(credenciais["senha"])
-        driver.find_element(By.ID, "login").click()
-        time.sleep(2)
+    def _click(self, element):
+        """Tenta clicar diretamente, se falhar usa JavaScript."""
+        try:
+            element.click()
+        except Exception:
+            self.driver.execute_script("arguments[0].click();", element)
 
-        # Busca pelo índice
-        driver.find_element(By.ID, "indice").send_keys(indice)
-        driver.find_element(By.ID, "buscar").click()
-        time.sleep(2)
+    def acessar(self):
+        """Abre o sistema Urbano."""
+        try:
+            logger.info("Acessando o sistema Urbano: %s", self.url)
+            self.driver.get(self.url)
+            return True
+        except Exception as e:
+            logger.error("Erro ao acessar o sistema Urbano: %s", e)
+            return False
 
-        # Screenshot
-        screenshot_path = f"{pasta_indice}/sistema2_{indice}.png"
-        driver.save_screenshot(screenshot_path)
-        logging.info(f"Screenshot salvo em {screenshot_path}")
+    def login(self):
+        """Realiza login no Urbano PBH."""
+        try:
+            logger.info("Iniciando login no Urbano")
 
-        # Simular download PDF
-        pdf_path = f"{pasta_indice}/sistema2_{indice}.pdf"
-        with open(pdf_path, "w") as f:
-            f.write("Simulação de PDF Sistema 2")
-        logging.info(f"PDF salvo em {pdf_path}")
+            # Clicar no botão de acesso
+            btn_acesso = self.wait.until(
+                EC.element_to_be_clickable(
+                    (By.XPATH, "//div[@class='panel-body' and text()='Acesso PBH']")
+                )
+            )
+            self._click(btn_acesso)
+            logger.info("Botão 'Acesso PBH' clicado")
 
-        driver.quit()
+            # Preencher usuário
+            campo_usuario = self.wait.until(
+                EC.presence_of_element_located((By.ID, "usuario"))
+            )
+            campo_usuario.clear()
+            campo_usuario.send_keys(self.usuario)
 
-    except Exception as e:
-        logging.error(f"Erro no Sistema 2 com índice {indice}: {e}")
-        raise
+            # Preencher senha
+            campo_senha = self.wait.until(
+                EC.presence_of_element_located((By.ID, "senha"))
+            )
+            campo_senha.clear()
+            campo_senha.send_keys(self.senha)
+
+            # Confirmar login
+            btn_login = self.wait.until(
+                EC.element_to_be_clickable(
+                    (By.XPATH, "//input[@type='submit' and @name='Login']")
+                )
+            )
+            self._click(btn_login)
+            logger.info("Login realizado com sucesso no Urbano")
+
+            return True
+        except Exception as e:
+            logger.error("Erro no login do Urbano: %s", e)
+            return False
+
+    def download_projeto(self, indice: str):
+        """
+        Pesquisa o projeto no Urbano, tira print da tela e, se houver resultados,
+        clica no primeiro projeto. Após acessar o projeto, tenta baixar
+        certidão de baixa ou alvará, caso existam, encerrando o processo após cada ação.
+        """
+        try:
+            logger.info("Iniciando pesquisa de projeto para índice: %s", indice)
+            indice = indice.strip()
+            if len(indice) < 11:
+                raise ValueError(f"Índice inválido: {indice}")
+
+            # Divisão do índice
+            parte1, parte2, parte3 = indice[0:3], indice[3:7], indice[7:11]
+
+            # --- Preencher campos ---
+            campo1 = self.wait.until(
+                EC.presence_of_element_located((By.NAME, "zonaFiscal"))
+            )
+            campo1.clear()
+            campo1.send_keys(parte1)
+
+            campo2 = self.wait.until(lambda d: d.find_element(By.NAME, "quart"))
+            WebDriverWait(self.driver, 5).until(lambda d: campo2.is_enabled())
+            campo2.clear()
+            campo2.send_keys(parte2)
+
+            campo3 = self.wait.until(lambda d: d.find_element(By.NAME, "lote"))
+            WebDriverWait(self.driver, 5).until(lambda d: campo3.is_enabled())
+            campo3.clear()
+            campo3.send_keys(parte3)
+
+            # --- Pesquisar ---
+            btn_pesquisar = self.wait.until(
+                EC.element_to_be_clickable((By.ID, "btnPesquisar"))
+            )
+            self._click(btn_pesquisar)
+            time.sleep(5)  # Aguarda resultados Angular
+            self.driver.execute_script(
+                "window.scrollTo(0, document.body.scrollHeight);"
+            )
+            time.sleep(2)  # Aguarda scroll
+
+            # --- Print da pesquisa ---
+            screenshot_path = os.path.join(
+                self.pasta_download, "Pesquisa de Projeto.png"
+            )
+            self.driver.save_screenshot(screenshot_path)
+            logger.info("Print da tela salvo em: %s", screenshot_path)
+
+            # --- Verificar tabela e clicar no primeiro projeto ---
+            try:
+                tabela_div = self.driver.find_element(
+                    By.CSS_SELECTOR,
+                    "div.table-responsive table tbody.project-search-results",
+                )
+                linhas = tabela_div.find_elements(By.TAG_NAME, "tr")
+                if not linhas:
+                    logger.info("Tabela encontrada, mas sem resultados")
+                    return True  # encerra aqui
+
+                primeiro_projeto = linhas[0].find_element(By.TAG_NAME, "a")
+                self._click(primeiro_projeto)
+                logger.info("Clicado no primeiro projeto da lista")
+                time.sleep(15)  # Aguarda carregar página do projeto
+
+            except NoSuchElementException:
+                logger.info("Tabela de resultados não encontrada")
+                return True  # encerra aqui
+
+            # --- Tentar baixar certidão de baixa ---
+            certidao = self.driver.find_elements(
+                By.XPATH,
+                "//a[contains(@href,'certidao-de-baixa') and text()='visualizar']",
+            )
+            if certidao:
+                certidao[0].click()  # clique, não get()
+                logger.info("Certidão de baixa baixada (clique realizado)")
+                time.sleep(10)  # aguarda download iniciar
+                return True  # encerra imediatamente
+
+            # --- Tentar baixar alvará ---
+            alvara = self.driver.find_elements(
+                By.XPATH,
+                "//a[contains(text(),'visualizar') and @ng-click='statusCtrl.abrirAlvara()']",
+            )
+            if alvara:
+                alvara[0].click()  # clique, não get()
+                logger.info("Alvará baixado (clique realizado)")
+                time.sleep(10)
+                return True
+
+            # --- Se nenhum documento encontrado, tirar print ---
+            screenshot_sem_doc = os.path.join(
+                self.pasta_download, "Sem Alvará-Baixa.png"
+            )
+            self.driver.save_screenshot(screenshot_sem_doc)
+            logger.info(
+                "Nenhum documento encontrado, print salvo em: %s", screenshot_sem_doc
+            )
+            return True
+
+        except Exception as e:
+            logger.error("Erro ao pesquisar projeto no Urbano (%s): %s", indice, e)
+            return False
