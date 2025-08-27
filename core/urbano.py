@@ -79,9 +79,8 @@ class UrbanoAuto:
 
     def download_projeto(self, indice: str):
         """
-        Pesquisa o projeto no Urbano, tira print da tela e, se houver resultados,
-        clica no primeiro projeto. Após acessar o projeto, tenta baixar
-        certidão de baixa ou alvará, caso existam, encerrando o processo após cada ação.
+        Pesquisa o projeto no Urbano e retorna a quantidade de projetos encontrados.
+        Também salva prints e tenta baixar certidão de baixa ou alvará se existirem.
         """
         try:
             logger.info("Iniciando pesquisa de projeto para índice: %s", indice)
@@ -127,17 +126,20 @@ class UrbanoAuto:
             self.driver.save_screenshot(screenshot_path)
             logger.info("Print da tela salvo em: %s", screenshot_path)
 
-            # --- Verificar tabela e clicar no primeiro projeto ---
+            # --- Verificar tabela e contar projetos ---
             try:
                 tabela_div = self.driver.find_element(
                     By.CSS_SELECTOR,
                     "div.table-responsive table tbody.project-search-results",
                 )
                 linhas = tabela_div.find_elements(By.TAG_NAME, "tr")
-                if not linhas:
-                    logger.info("Tabela encontrada, mas sem resultados")
-                    return True  # encerra aqui
+                qtd_projetos = len(linhas)
+                logger.info("%d projetos encontrados", qtd_projetos)
 
+                if qtd_projetos == 0:
+                    return 0
+
+                # --- Clicar no primeiro projeto para tentar baixar documentos ---
                 primeiro_projeto = linhas[0].find_element(By.TAG_NAME, "a")
                 self._click(primeiro_projeto)
                 logger.info("Clicado no primeiro projeto da lista")
@@ -145,7 +147,7 @@ class UrbanoAuto:
 
             except NoSuchElementException:
                 logger.info("Tabela de resultados não encontrada")
-                return True  # encerra aqui
+                return 0
 
             # --- Tentar baixar certidão de baixa ---
             certidao = self.driver.find_elements(
@@ -153,10 +155,10 @@ class UrbanoAuto:
                 "//a[contains(@href,'certidao-de-baixa') and text()='visualizar']",
             )
             if certidao:
-                certidao[0].click()  # clique, não get()
+                certidao[0].click()
                 logger.info("Certidão de baixa baixada (clique realizado)")
-                time.sleep(10)  # aguarda download iniciar
-                return True  # encerra imediatamente
+                time.sleep(10)
+                return qtd_projetos
 
             # --- Tentar baixar alvará ---
             alvara = self.driver.find_elements(
@@ -164,21 +166,24 @@ class UrbanoAuto:
                 "//a[contains(text(),'visualizar') and @ng-click='statusCtrl.abrirAlvara()']",
             )
             if alvara:
-                alvara[0].click()  # clique, não get()
+                alvara[0].click()
                 logger.info("Alvará baixado (clique realizado)")
                 time.sleep(10)
-                return True
+                return qtd_projetos
 
-            # --- Se nenhum documento encontrado, tirar print ---
-            screenshot_sem_doc = os.path.join(
-                self.pasta_download, "Sem Alvará-Baixa.png"
-            )
-            self.driver.save_screenshot(screenshot_sem_doc)
-            logger.info(
-                "Nenhum documento encontrado, print salvo em: %s", screenshot_sem_doc
-            )
-            return True
+            # --- Se nenhum documento encontrado, salvar print ---
+            if not certidao and not alvara:
+                screenshot_sem_doc = os.path.join(
+                    self.pasta_download, "Sem Alvará-Baixa.png"
+                )
+                self.driver.save_screenshot(screenshot_sem_doc)
+                logger.info(
+                    "Nenhum documento encontrado, print salvo em: %s",
+                    screenshot_sem_doc,
+                )
+
+            return qtd_projetos
 
         except Exception as e:
             logger.error("Erro ao pesquisar projeto no Urbano (%s): %s", indice, e)
-            return False
+            return 0

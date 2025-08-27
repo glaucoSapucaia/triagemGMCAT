@@ -101,6 +101,7 @@ class SiatuAuto:
             anexos = self.driver.find_elements(
                 By.XPATH, "//table//tr/td[1]/a[contains(@onclick, 'exibeDocumento')]"
             )
+            qtd_anexos = 0
 
             for i, anexo in enumerate(anexos, start=1):
                 # Reconsultar os elementos para evitar StaleElementReferenceException
@@ -116,6 +117,7 @@ class SiatuAuto:
                 if not nome_arquivo.lower().endswith(".pdf"):
                     logger.info("Anexo %d ignorado (não é PDF): %s", i, nome_arquivo)
                     continue
+                qtd_anexos += 1
 
                 # Guardar a janela principal antes do clique
                 janela_principal = self.driver.current_window_handle
@@ -138,7 +140,7 @@ class SiatuAuto:
                 logger.info("Nenhum arquivo disponível para download")
 
             time.sleep(2)  # tempo para o download finalizar
-            return True
+            return qtd_anexos
 
         except TimeoutException as e:
             logger.error("Timeout ao tentar baixar anexos: %s", e)
@@ -204,6 +206,9 @@ class SiatuAuto:
 
             time.sleep(2)
 
+            dados_PB = self._capturar_dados_imovel()
+
+            time.sleep(2)
             # 5. Clicar no link "Gera Planta Básica Resumida"
             link_planta_resumida = self.wait.until(
                 EC.element_to_be_clickable(
@@ -231,7 +236,7 @@ class SiatuAuto:
             # Voltar para a janela principal
             self.driver.switch_to.window(janela_principal)
             time.sleep(2)  # tempo para o download finalizar
-            return True
+            return dados_PB
 
         except TimeoutException as e:
             logger.error("Timeout ao tentar gerar Planta Básica Resumida: %s", e)
@@ -242,3 +247,45 @@ class SiatuAuto:
         except Exception as e:
             logger.error("Erro inesperado em planta_basica: %s", e)
             return False
+
+    def _capturar_dados_imovel(self):
+        """
+        Captura os dados do imóvel: Área Construída, Exercício e Tipo de Uso
+        usando índices numéricos das células nas tabelas.
+
+        Returns:
+            dict com as chaves: 'area_construida', 'exercicio', 'tipo_uso'
+        """
+        dados = {}
+
+        try:
+            # EXERCÍCIO: segunda td do segundo tr da tabela table_item com label "Exercício"
+            exercicio_elem = self.driver.find_element(
+                By.XPATH,
+                "(//table[contains(@class,'table_item')][.//td[text()='Exercício']]//tr)[2]/td[@class='valor_campo']",
+            )
+            dados["exercicio"] = int(exercicio_elem.text.strip())
+        except Exception:
+            dados["exercicio"] = None
+
+        try:
+            # TIPO DE USO: quinta td do segundo tr da table_grid
+            tipo_uso_elem = self.driver.find_element(
+                By.XPATH,
+                "(//table[contains(@class,'table_grid')]//tr[td and count(td)=6])[2]/td[5]",
+            )
+            dados["tipo_uso"] = tipo_uso_elem.text.strip()
+        except Exception:
+            dados["tipo_uso"] = None
+
+        try:
+            area_elem = self.driver.find_element(
+                By.XPATH, "(//table[contains(@class,'table_grid2')]//tr)[2]/td[3]"
+            )
+            area_val = float(area_elem.text.strip())
+            # Mantém duas casas decimais como string
+            dados["area_construida"] = "{:.2f}".format(area_val)
+        except Exception:
+            dados["area_construida"] = "0.00"
+
+        return dados

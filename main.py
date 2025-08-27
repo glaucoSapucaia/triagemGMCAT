@@ -3,7 +3,7 @@ import os
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from interface import iniciar_interface
-from core import SiatuAuto, UrbanoAuto
+from core import SiatuAuto, UrbanoAuto, gerar_relatorio
 
 # Configuração do logger
 logging.basicConfig(
@@ -53,7 +53,6 @@ def main():
 
         for indice in indices:
             try:
-                # Criar pasta específica para cada índice
                 pasta_indice = os.path.join("resultados", indice)
                 os.makedirs(pasta_indice, exist_ok=True)
 
@@ -74,16 +73,13 @@ def main():
                         pasta_download=pasta_indice,
                     )
 
-                    if (
-                        siatu.acessar()
-                        and siatu.login()
-                        and siatu.navegar()
-                        and siatu.planta_basica(indice)
-                        and siatu.download_anexos(indice)
-                    ):
-                        logging.info(f"Sistema 1 concluído para índice {indice}")
-                    else:
-                        logging.warning(f"Falha no Sistema 1 para índice {indice}")
+                    anexos_count = 0
+
+                    if siatu.acessar() and siatu.login() and siatu.navegar():
+                        dados_PB = siatu.planta_basica(indice)
+                        anexos_count = siatu.download_anexos(indice)  # número de anexos
+
+                    logging.info(f"Sistema 1 concluído para índice {indice}")
                 finally:
                     driver_siatu.quit()
 
@@ -98,16 +94,28 @@ def main():
                         pasta_download=pasta_indice,
                     )
 
-                    if (
-                        urbano.acessar()
-                        and urbano.login()
-                        and urbano.download_projeto(indice)
-                    ):
-                        logging.info(f"Sistema 2 concluído para índice {indice}")
-                    else:
-                        logging.warning(f"Falha no Sistema 2 para índice {indice}")
+                    projetos_count = 0
+                    if urbano.acessar() and urbano.login():
+                        projetos_count = urbano.download_projeto(
+                            indice
+                        )  # número de projetos
+
+                    logging.info(f"Sistema 2 concluído para índice {indice}")
                 finally:
                     driver_urbano.quit()
+
+                # --- Gerar relatório PDF ---
+                pdf_path = os.path.join(pasta_indice, f"relatorio_{indice}.pdf")
+                gerar_relatorio(
+                    indice_cadastral=indice,
+                    anexos_count=anexos_count,
+                    projetos_count=projetos_count,
+                    pasta_anexos=pasta_indice,
+                    prps_trabalhador=credenciais["usuario"],
+                    nome_pdf=pdf_path,
+                    dados_planta=dados_PB,
+                )
+                logging.info(f"Relatório gerado: {pdf_path}")
 
             except Exception as e:
                 logging.error(f"Erro no processamento do índice {indice}: {e}")
