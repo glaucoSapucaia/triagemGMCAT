@@ -1,7 +1,7 @@
 import logging
 import os
 from selenium import webdriver
-from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.chrome.options import Options
 from interface import iniciar_interface
 from core import SiatuAuto, UrbanoAuto
 
@@ -13,40 +13,37 @@ logging.basicConfig(
 )
 
 
-def criar_driver(pasta_indice=None):
-    """Configura e retorna um driver Firefox independente."""
-    firefox_options = Options()
-    firefox_options.headless = False
+def criar_driver(pasta_indice=None, caminho_perfil=None, nome_perfil="Default"):
+    """
+    Configura e retorna um driver Chrome usando um perfil específico já criado.
 
-    # Preferências de download (apenas se houver pasta configurada)
+    :param pasta_indice: pasta onde salvar os downloads (se configurada).
+    :param caminho_perfil: caminho para a pasta de perfis do Chrome (ex.: C:/Users/SEUUSUARIO/AppData/Local/Google/Chrome/User Data).
+    :param nome_perfil: nome do perfil do Chrome (ex.: "Default", "Profile 1").
+    """
+    chrome_options = Options()
+    chrome_options.add_argument("--start-maximized")
+    chrome_options.add_argument("--disable-popup-blocking")
+    chrome_options.add_argument("--ignore-certificate-errors")
+    chrome_options.add_argument("--disable-extensions")
+
+    # Usar um perfil já existente do Chrome
+    if caminho_perfil:
+        chrome_options.add_argument(f"user-data-dir={caminho_perfil}")
+        chrome_options.add_argument(f"--profile-directory={nome_perfil}")
+
+    # Configurações de download automático
     if pasta_indice:
-        firefox_options.set_preference("browser.download.folderList", 2)
-        firefox_options.set_preference(
-            "browser.download.dir", os.path.abspath(pasta_indice)
-        )
-        firefox_options.set_preference(
-            "browser.helperApps.neverAsk.saveToDisk",
-            "application/pdf,application/octet-stream",
-        )
-        firefox_options.set_preference(
-            "browser.helperApps.neverAsk.openFile", "application/pdf"
-        )
-        firefox_options.set_preference(
-            "browser.download.manager.showWhenStarting", False
-        )
-        firefox_options.set_preference("browser.download.useDownloadDir", True)
-        firefox_options.set_preference("browser.download.panel.shown", False)
-        firefox_options.set_preference("pdfjs.disabled", True)
+        prefs = {
+            "download.default_directory": os.path.abspath(pasta_indice),
+            "download.prompt_for_download": False,
+            "download.directory_upgrade": True,
+            "plugins.always_open_pdf_externally": True,  # não abre PDF no Chrome, baixa direto
+        }
+        chrome_options.add_experimental_option("prefs", prefs)
 
-    # Certificados inseguros ok
-    firefox_options.set_preference("webdriver_accept_untrusted_certs", True)
-    firefox_options.set_preference("webdriver_assume_untrusted_issuer", True)
-
-    # Aceitar automaticamente QUALQUER prompt nativo
-    firefox_options.set_capability("unhandledPromptBehavior", "accept")
-    firefox_options.set_capability("acceptInsecureCerts", True)
-
-    return webdriver.Firefox(options=firefox_options)
+    driver = webdriver.Chrome(options=chrome_options)
+    return driver
 
 
 def main():
@@ -63,7 +60,11 @@ def main():
                 logging.info(f"Iniciando coleta para índice: {indice}")
 
                 # --- Sistema 1: Siatu ---
-                driver_siatu = criar_driver(pasta_indice)
+                driver_siatu = criar_driver(
+                    pasta_indice,
+                    caminho_perfil=r"C:\Users\glauc\AppData\Local\Google\Chrome\SeleniumProfile",
+                    nome_perfil="Default",
+                )
                 try:
                     siatu = SiatuAuto(
                         driver=driver_siatu,
@@ -77,8 +78,8 @@ def main():
                         siatu.acessar()
                         and siatu.login()
                         and siatu.navegar()
-                        and siatu.download_anexos(indice)
                         and siatu.planta_basica(indice)
+                        and siatu.download_anexos(indice)
                     ):
                         logging.info(f"Sistema 1 concluído para índice {indice}")
                     else:
