@@ -137,7 +137,10 @@ class UrbanoAuto:
                 logger.info("%d projetos encontrados", qtd_projetos)
 
                 if qtd_projetos == 0:
-                    return 0
+                    dados_projeto = self._capturar_dados_projeto(
+                        nome_arquivo="Não informado"
+                    )
+                    return 0, dados_projeto
 
                 # --- Clicar no primeiro projeto para tentar baixar documentos ---
                 primeiro_projeto = linhas[0].find_element(By.TAG_NAME, "a")
@@ -147,7 +150,10 @@ class UrbanoAuto:
 
             except NoSuchElementException:
                 logger.info("Tabela de resultados não encontrada")
-                return 0
+                dados_projeto = self._capturar_dados_projeto(
+                    nome_arquivo="Não informado"
+                )
+                return 0, dados_projeto
 
             # --- Tentar baixar certidão de baixa ---
             certidao = self.driver.find_elements(
@@ -158,7 +164,10 @@ class UrbanoAuto:
                 certidao[0].click()
                 logger.info("Certidão de baixa baixada (clique realizado)")
                 time.sleep(10)
-                return qtd_projetos
+                dados_projeto = self._capturar_dados_projeto(
+                    nome_arquivo="Certidão de Baixa"
+                )
+                return qtd_projetos, dados_projeto
 
             # --- Tentar baixar alvará ---
             alvara = self.driver.find_elements(
@@ -169,7 +178,8 @@ class UrbanoAuto:
                 alvara[0].click()
                 logger.info("Alvará baixado (clique realizado)")
                 time.sleep(10)
-                return qtd_projetos
+                dados_projeto = self._capturar_dados_projeto(nome_arquivo="Alvará")
+                return qtd_projetos, dados_projeto
 
             # --- Se nenhum documento encontrado, salvar print ---
             if not certidao and not alvara:
@@ -182,8 +192,58 @@ class UrbanoAuto:
                     screenshot_sem_doc,
                 )
 
-            return qtd_projetos
+                dados_projeto = self._capturar_dados_projeto(
+                    nome_arquivo="Não informado"
+                )
+                return qtd_projetos, dados_projeto
 
         except Exception as e:
             logger.error("Erro ao pesquisar projeto no Urbano (%s): %s", indice, e)
             return 0
+
+    def _capturar_dados_projeto(self, nome_arquivo=None):
+        """
+        Captura os dados do projeto:
+        - Tipo: nome do arquivo baixado
+        - Requerimento
+        - Última alteração
+        - Área do(s) lote(s)
+        Caso algum campo não seja encontrado, retorna 'Não informado'.
+        """
+        dados = {}
+        time.sleep(2)  # Pequena espera para garantir carregamento
+
+        # 1. Tipo: nome do arquivo
+        dados["tipo"] = nome_arquivo if nome_arquivo else "Não informado"
+
+        try:
+            # 2. Requerimento
+            requerimento_elem = self.driver.find_element(
+                By.XPATH,
+                "//span[@ng-if='$ctrl.ps.modoVisualizacao() || !$ctrl.isNomeEditavel']",
+            )
+            dados["requerimento"] = requerimento_elem.text.strip()
+        except Exception:
+            dados["requerimento"] = "Não informado"
+
+        try:
+            # Localiza o span que contém o texto "Última alteração"
+            # e pega o segundo <small> dentro dele (após o <br>)
+            ultima_alteracao_elem = self.driver.find_element(
+                By.XPATH, "//span[small[text()='Última alteração']]/small[2]"
+            )
+            dados["ultima_alteracao"] = ultima_alteracao_elem.text.strip()
+        except Exception:
+            dados["ultima_alteracao"] = "Não informado"
+
+        try:
+            # 4. Área do(s) lote(s)
+            area_lote_elem = self.driver.find_element(
+                By.XPATH,
+                "//p[@class='form-control-static ng-binding']//span[@class='ng-binding']",
+            )
+            dados["area_lotes"] = area_lote_elem.text.strip()
+        except Exception:
+            dados["area_lotes"] = "Não informado"
+
+        return dados

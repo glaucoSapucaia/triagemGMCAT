@@ -1,9 +1,15 @@
 import logging
 import os
+from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from interface import iniciar_interface
 from core import SiatuAuto, UrbanoAuto, gerar_relatorio
+import locale
+
+# Define a localidade para português do Brasil
+locale.setlocale(locale.LC_TIME, "pt_BR.UTF-8")
+
 
 # Configuração do logger
 logging.basicConfig(
@@ -51,9 +57,14 @@ def main():
         # Interface coleta credenciais e índices
         credenciais, indices = iniciar_interface()
 
+        # Timestamp legível
+        timestamp_legivel = datetime.now().strftime("Resultados - %d de %B de %Y %Hh%M")
+        pasta_resultados = timestamp_legivel
+        os.makedirs(pasta_resultados, exist_ok=True)
+
         for indice in indices:
             try:
-                pasta_indice = os.path.join("resultados", indice)
+                pasta_indice = os.path.join(pasta_resultados, indice)
                 os.makedirs(pasta_indice, exist_ok=True)
 
                 logging.info(f"Iniciando coleta para índice: {indice}")
@@ -96,7 +107,7 @@ def main():
 
                     projetos_count = 0
                     if urbano.acessar() and urbano.login():
-                        projetos_count = urbano.download_projeto(
+                        projetos_count, dados_projeto = urbano.download_projeto(
                             indice
                         )  # número de projetos
 
@@ -105,7 +116,9 @@ def main():
                     driver_urbano.quit()
 
                 # --- Gerar relatório PDF ---
-                pdf_path = os.path.join(pasta_indice, f"relatorio_{indice}.pdf")
+                pdf_path = os.path.join(
+                    pasta_indice, f"Relatório de Triagem - {indice}.pdf"
+                )
                 gerar_relatorio(
                     indice_cadastral=indice,
                     anexos_count=anexos_count,
@@ -114,6 +127,7 @@ def main():
                     prps_trabalhador=credenciais["usuario"],
                     nome_pdf=pdf_path,
                     dados_planta=dados_PB,
+                    dados_projeto=dados_projeto,
                 )
                 logging.info(f"Relatório gerado: {pdf_path}")
 
@@ -121,7 +135,6 @@ def main():
                 logging.error(f"Erro no processamento do índice {indice}: {e}")
 
         # --- Abrir pasta resultados após processar todos os índices ---
-        pasta_resultados = os.path.abspath("resultados")
         if os.path.exists(pasta_resultados):
             logging.info(f"Abrindo pasta de resultados: {pasta_resultados}")
             os.startfile(pasta_resultados)

@@ -250,42 +250,69 @@ class SiatuAuto:
 
     def _capturar_dados_imovel(self):
         """
-        Captura os dados do imóvel: Área Construída, Exercício e Tipo de Uso
-        usando índices numéricos das células nas tabelas.
-
-        Returns:
-            dict com as chaves: 'area_construida', 'exercicio', 'tipo_uso'
+        Captura os dados do imóvel: Área Construída, Exercício, Tipo de Uso,
+        Matrícula de Registro e Cartório.
+        Caso não existam, retorna 'Não informado' (texto).
         """
+
         dados = {}
 
         try:
-            # EXERCÍCIO: segunda td do segundo tr da tabela table_item com label "Exercício"
+            # EXERCÍCIO
             exercicio_elem = self.driver.find_element(
                 By.XPATH,
                 "(//table[contains(@class,'table_item')][.//td[text()='Exercício']]//tr)[2]/td[@class='valor_campo']",
             )
-            dados["exercicio"] = int(exercicio_elem.text.strip())
+            dados["exercicio"] = exercicio_elem.text.strip()
         except Exception:
-            dados["exercicio"] = None
+            dados["exercicio"] = "Não informado"
 
         try:
-            # TIPO DE USO: quinta td do segundo tr da table_grid
+            # TIPO DE USO
             tipo_uso_elem = self.driver.find_element(
                 By.XPATH,
                 "(//table[contains(@class,'table_grid')]//tr[td and count(td)=6])[2]/td[5]",
             )
             dados["tipo_uso"] = tipo_uso_elem.text.strip()
         except Exception:
-            dados["tipo_uso"] = None
+            dados["tipo_uso"] = "Não informado"
 
         try:
+            # ÁREA CONSTRUÍDA
             area_elem = self.driver.find_element(
                 By.XPATH, "(//table[contains(@class,'table_grid2')]//tr)[2]/td[3]"
             )
             area_val = float(area_elem.text.strip())
-            # Mantém duas casas decimais como string
             dados["area_construida"] = "{:.2f}".format(area_val)
         except Exception:
-            dados["area_construida"] = "0.00"
+            dados["area_construida"] = "Não informado"
+
+        try:
+            # MATRÍCULA DE REGISTRO
+            matricula_elem = self.driver.find_element(
+                By.XPATH,
+                "//table[contains(@class,'table_item')][.//td[text()='Matrícula de Registro']]//tr[2]/td[@class='valor_campo']",
+            )
+            valor = matricula_elem.text
+            if valor and valor.strip():  # se não for None e não for vazio
+                dados["matricula_registro"] = valor.strip()
+            else:
+                dados["matricula_registro"] = "Não informado"
+        except Exception:
+            dados["matricula_registro"] = "Não informado"
+
+        try:
+            # CARTÓRIO
+            cartorio_elem = self.driver.find_element(
+                By.XPATH,
+                "//table[contains(@class,'table_item')][.//td[text()='Cartório']]//tr[2]/td[@class='valor_campo']",
+            )
+            dados["cartorio"] = (
+                cartorio_elem.text.strip()
+                if cartorio_elem.text.strip() not in [None, "", "-"]
+                else "Não informado"
+            )
+        except Exception:
+            dados["cartorio"] = "Não informado"
 
         return dados
