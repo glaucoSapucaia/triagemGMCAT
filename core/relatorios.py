@@ -1,5 +1,7 @@
 import os
+import re
 from reportlab.lib.pagesizes import A4
+from urllib.parse import quote
 from reportlab.platypus import (
     SimpleDocTemplate,
     Paragraph,
@@ -7,12 +9,16 @@ from reportlab.platypus import (
     ListFlowable,
     ListItem,
     HRFlowable,
-    Image,
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib import colors
 from datetime import datetime
+
+
+def normalizar_nome(arq: str) -> str:
+    """Substitui qualquer caractere fora de A–Z, a–z, 0–9, _, . ou - por '_'."""
+    return re.sub(r"[^A-Za-z0-9_.-]", "_", arq)
 
 
 def gerar_relatorio(
@@ -44,14 +50,6 @@ def gerar_relatorio(
         alignment=TA_CENTER,
         textColor=colors.darkblue,
         spaceAfter=12,
-    )
-    estilo_info = ParagraphStyle(
-        "Info",
-        parent=estilos["Normal"],
-        fontSize=11,
-        alignment=TA_CENTER,
-        fontName="Helvetica-Bold",
-        spaceAfter=20,
     )
     estilo_info_normal = ParagraphStyle(
         "InfoNormal",
@@ -95,7 +93,7 @@ def gerar_relatorio(
         )
     )
 
-    # Função auxiliar para adicionar seções
+    # Seções utilitárias
     def adicionar_secao(titulo_secao, texto_secao=None):
         elementos.append(HRFlowable(width="100%", thickness=1, color=colors.grey))
         elementos.append(Spacer(1, 8))
@@ -104,34 +102,51 @@ def gerar_relatorio(
             elementos.append(Paragraph(texto_secao, estilo_texto))
         elementos.append(Spacer(1, 12))
 
-    # Função para inserir anexos em uma seção (mesma pasta do PDF)
+    # >>> AQUI está o pulo do gato: prefixo "./" no href <<<
     def adicionar_anexos(lista_arquivos):
         for arq in lista_arquivos:
-            # Caminho relativo = apenas o nome do arquivo
-            caminho_relativo = arq
-
-            elementos.append(
-                Paragraph(f'<a href="{caminho_relativo}">{arq}</a>', estilo_link)
+            # arq já está normalizado; ainda assim, aplicamos quote por segurança
+            href = "./" + quote(
+                arq,
+                safe="._-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
             )
+            elementos.append(Paragraph(f'<a href="{href}">{arq}</a>', estilo_link))
             elementos.append(Spacer(1, 5))
 
-    # --- Preparar anexos ---
-    anexos_planta = []
-    anexos_siatu = []
-    anexos_projetos = []
+    # --- Preparar anexos (com renomeação no disco para nomes seguros) ---
+    anexos_planta, anexos_siatu, anexos_projetos = [], [], []
 
     if pasta_anexos and os.path.exists(pasta_anexos):
         for arq in sorted(os.listdir(pasta_anexos)):
-            # Planta básica continua igual
+            nome_norm = normalizar_nome(arq)
+            src = os.path.join(pasta_anexos, arq)
+            dst = os.path.join(pasta_anexos, nome_norm)
+            if arq != nome_norm:
+                try:
+                    os.rename(src, dst)
+                except FileExistsError:
+                    # Se já existir um igual, desambiguação simples
+                    base, ext = os.path.splitext(nome_norm)
+                    i = 1
+                    while os.path.exists(dst):
+                        dst = os.path.join(pasta_anexos, f"{base}_{i}{ext}")
+                        i += 1
+                    os.rename(src, dst)
+                    nome_norm = os.path.basename(dst)
+                except Exception:
+                    # Se não conseguir renomear, segue com o nome original (mas o link pode falhar)
+                    nome_norm = arq
+
+            arq = nome_norm  # usar o nome final
+
+            # Classificação
             if "Planta_Basica" in arq:
                 anexos_planta.append(arq)
-                continue
-
-            # Projeto, Alvará e Baixa de Construção
-            if (
+            elif (
                 arq.lower().endswith(".png")
                 or "certidao_baixa" in arq.lower()
                 or "alvara_construcao" in arq.lower()
+                or "projeto" in arq.lower()
             ):
                 anexos_projetos.append(arq)
             else:
@@ -158,17 +173,14 @@ def gerar_relatorio(
     adicionar_secao(
         "2. Planta Básica - Exercício seguinte ou Primeiro do Ano", texto_planta
     )
-    adicionar_anexos(anexos_planta)  # anexar aqui
+    adicionar_anexos(anexos_planta)
 
     adicionar_secao(
         "3. Croqui e Anexos Siatu", f"{anexos_count} anexo(s) encontrado(s)."
     )
-    adicionar_anexos(anexos_siatu)  # anexar aqui
+    adicionar_anexos(anexos_siatu)
 
-    # --- Seção Projeto ---
     texto_projeto = f"{projetos_count} anexo(s) encontrado(s)."
-
-    # Se houver dados do projeto, adiciona informações detalhadas
     if dados_projeto:
         texto_projeto += "<br/>"
         texto_projeto += (
@@ -177,11 +189,9 @@ def gerar_relatorio(
         texto_projeto += f"<b>Requerimento:</b> {dados_projeto.get('requerimento', 'Não informado')}<br/>"
         texto_projeto += f"<b>Última Alteração:</b> {dados_projeto.get('ultima_alteracao', 'Não informado')}<br/>"
         texto_projeto += f"<b>Área do(s) lote(s):</b> {dados_projeto.get('area_lotes', 'Não informado')}"
-
     adicionar_secao("4. Projeto, Alvará e Baixa de Construção", texto_projeto)
-    adicionar_anexos(anexos_projetos)  # anexar aqui
+    adicionar_anexos(anexos_projetos)
 
-    # --- Seção Matrícula ---
     if dados_planta:
         texto_matricula = f"""
         <b>Número:</b> {dados_planta.get('matricula_registro', 'Não informado')}<br/>
@@ -189,7 +199,6 @@ def gerar_relatorio(
         """
     else:
         texto_matricula = "Não informado"
-
     adicionar_secao("5. Matrícula do Imóvel", texto_matricula)
 
     adicionar_secao("6. Moradores Ocupantes", "Pesquisa realizada na base da CEMIG.")

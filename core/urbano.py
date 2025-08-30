@@ -113,18 +113,11 @@ class UrbanoAuto:
                 EC.element_to_be_clickable((By.ID, "btnPesquisar"))
             )
             self._click(btn_pesquisar)
-            time.sleep(5)  # Aguarda resultados Angular
+            time.sleep(10)  # Aguarda resultados Angular
             self.driver.execute_script(
                 "window.scrollTo(0, document.body.scrollHeight);"
             )
-            time.sleep(2)  # Aguarda scroll
-
-            # --- Print da pesquisa ---
-            screenshot_path = os.path.join(
-                self.pasta_download, "Pesquisa de Projeto.png"
-            )
-            self.driver.save_screenshot(screenshot_path)
-            logger.info("Print da tela salvo em: %s", screenshot_path)
+            time.sleep(4)  # Aguarda scroll
 
             # --- Verificar tabela e contar projetos ---
             try:
@@ -140,6 +133,14 @@ class UrbanoAuto:
                     dados_projeto = self._capturar_dados_projeto(
                         nome_arquivo="Não informado"
                     )
+
+                    # --- Print da pesquisa ---
+                    screenshot_path = os.path.join(
+                        self.pasta_download, "Pesquisa de Projeto.png"
+                    )
+                    self.driver.save_screenshot(screenshot_path)
+                    logger.info("Print da tela salvo em: %s", screenshot_path)
+
                     return 0, dados_projeto
 
                 # --- Clicar no primeiro projeto para tentar baixar documentos ---
@@ -153,6 +154,14 @@ class UrbanoAuto:
                 dados_projeto = self._capturar_dados_projeto(
                     nome_arquivo="Não informado"
                 )
+
+                # --- Print da pesquisa ---
+                screenshot_path = os.path.join(
+                    self.pasta_download, "Pesquisa de Projeto.png"
+                )
+                self.driver.save_screenshot(screenshot_path)
+                logger.info("Print da tela salvo em: %s", screenshot_path)
+
                 return 0, dados_projeto
 
             # --- Tentar baixar certidão de baixa ---
@@ -178,13 +187,16 @@ class UrbanoAuto:
                 alvara[0].click()
                 logger.info("Alvará baixado (clique realizado)")
                 time.sleep(10)
-                dados_projeto = self._capturar_dados_projeto(nome_arquivo="Alvará")
+                dados_projeto = self._capturar_dados_projeto(
+                    nome_arquivo="Alvará de Contrução"
+                )
                 return qtd_projetos, dados_projeto
 
             # --- Se nenhum documento encontrado, salvar print ---
             if not certidao and not alvara:
+                time.sleep(4)
                 screenshot_sem_doc = os.path.join(
-                    self.pasta_download, "Sem Alvará-Baixa.png"
+                    self.pasta_download, "Sem Alvara-Baixa.png"
                 )
                 self.driver.save_screenshot(screenshot_sem_doc)
                 logger.info(
@@ -192,14 +204,76 @@ class UrbanoAuto:
                     screenshot_sem_doc,
                 )
 
-                dados_projeto = self._capturar_dados_projeto(
-                    nome_arquivo="Não informado"
-                )
-                return qtd_projetos, dados_projeto
+                # --- Clicar em "Documentos Anexos" ---
+                try:
+                    documentos_anexos = self.wait.until(
+                        EC.element_to_be_clickable(
+                            (By.XPATH, "//li[@ui-sref='home.perm.projeto.anexos']")
+                        )
+                    )
+                    documentos_anexos.click()
+                    logger.info("Clicado em 'Documentos Anexos'")
+                except TimeoutException:
+                    logger.warning(
+                        "Não foi possível encontrar o botão 'Documentos Anexos'"
+                    )
+                    return qtd_projetos, self._capturar_dados_projeto(
+                        nome_arquivo="Não informado"
+                    )
+
+                # --- Aguardar aparecer o painel "Pranchas do Projeto" ---
+                try:
+                    self.wait.until(
+                        EC.presence_of_element_located(
+                            (By.XPATH, "//h3[contains(text(),'Pranchas do Projeto')]")
+                        )
+                    )
+                    logger.info("Painel 'Pranchas do Projeto' carregado")
+                except TimeoutException:
+                    logger.warning("Painel 'Pranchas do Projeto' não carregou a tempo")
+                    return qtd_projetos, self._capturar_dados_projeto(
+                        nome_arquivo="Não informado"
+                    )
+
+                # --- Clicar no primeiro arquivo da tabela ---
+                try:
+                    primeiro_arquivo = self.wait.until(
+                        EC.presence_of_element_located(
+                            (By.XPATH, "//table//tbody//tr[1]//td[1]//a")
+                        )
+                    )
+                    self.driver.execute_script(
+                        "arguments[0].scrollIntoView(true);", primeiro_arquivo
+                    )
+                    self.wait.until(
+                        EC.element_to_be_clickable(
+                            (By.XPATH, "//table//tbody//tr[1]//td[1]//a")
+                        )
+                    )
+
+                    nome_arquivo = primeiro_arquivo.text.strip()
+                    try:
+                        primeiro_arquivo.click()
+                    except Exception:
+                        # fallback se o Selenium não conseguir clicar
+                        self.driver.execute_script(
+                            "arguments[0].click();", primeiro_arquivo
+                        )
+
+                    logger.info("Download iniciado para: %s", nome_arquivo)
+                    time.sleep(10)
+                    dados_projeto = self._capturar_dados_projeto(nome_arquivo="Projeto")
+                    return qtd_projetos, dados_projeto
+                except TimeoutException:
+                    logger.warning("Nenhum arquivo encontrado na tabela de anexos")
+                    return qtd_projetos, self._capturar_dados_projeto(
+                        nome_arquivo="Não informado"
+                    )
 
         except Exception as e:
             logger.error("Erro ao pesquisar projeto no Urbano (%s): %s", indice, e)
-            return 0
+            dados_projeto = self._capturar_dados_projeto(nome_arquivo=nome_arquivo)
+            return 0, dados_projeto
 
     def _capturar_dados_projeto(self, nome_arquivo=None):
         """

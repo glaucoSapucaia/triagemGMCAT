@@ -94,8 +94,8 @@ class SiatuAuto:
                 EC.element_to_be_clickable((By.XPATH, "//a[text()='Anexos']"))
             )
             self._click(link_anexos)
+            time.sleep(2)  # tempo para a página carregar
             logger.info("Link 'Anexos' clicado")
-            time.sleep(2)
 
             # 5. Verificar se há arquivos para download
             anexos = self.driver.find_elements(
@@ -122,10 +122,17 @@ class SiatuAuto:
                 # Guardar a janela principal antes do clique
                 janela_principal = self.driver.current_window_handle
 
+                arquivo_caminho = os.path.join(self.pasta_download, nome_arquivo)
                 self._click(anexo_atual)
                 logger.info("Anexo %d clicado: %s", i, nome_arquivo)
 
-                time.sleep(2)  # tempo para o download iniciar
+                # Espera o download concluir
+                if self.esperar_download_concluir(arquivo_caminho, timeout=120):
+                    logger.info("Download concluído: %s", nome_arquivo)
+                else:
+                    logger.warning(
+                        "Download NÃO concluído no tempo limite: %s", nome_arquivo
+                    )
 
                 # Fechar qualquer janela nova que tenha sido aberta
                 janelas_atuais = self.driver.window_handles
@@ -278,12 +285,24 @@ class SiatuAuto:
             dados["tipo_uso"] = "Não informado"
 
         try:
-            # ÁREA CONSTRUÍDA
-            area_elem = self.driver.find_element(
-                By.XPATH, "(//table[contains(@class,'table_grid2')]//tr)[2]/td[3]"
+            # CAPTURA TODOS OS VALORES DE ÁREA CONSTRUÍDA
+            area_elems = self.driver.find_elements(
+                By.XPATH, "//table[contains(@class,'table_grid2')]//tr/td[3]"
             )
-            area_val = float(area_elem.text.strip())
-            dados["area_construida"] = "{:.2f}".format(area_val)
+            areas = []
+            for elem in area_elems:
+                txt = elem.text.strip()
+                if txt:  # ignora células vazias
+                    try:
+                        areas.append(float(txt.replace(",", ".")))  # caso use vírgula
+                    except ValueError:
+                        pass
+
+            if areas:
+                soma_areas = sum(areas)
+                dados["area_construida"] = "{:.2f}".format(soma_areas)
+            else:
+                dados["area_construida"] = "Não informado"
         except Exception:
             dados["area_construida"] = "Não informado"
 
@@ -316,3 +335,13 @@ class SiatuAuto:
             dados["cartorio"] = "Não informado"
 
         return dados
+
+    def esperar_download_concluir(self, caminho_arquivo, timeout=60):
+        inicio = time.time()
+        while True:
+            tmp = caminho_arquivo + ".crdownload"
+            if os.path.exists(caminho_arquivo) and not os.path.exists(tmp):
+                return True
+            if time.time() - inicio > timeout:
+                return False
+            time.sleep(0.5)
