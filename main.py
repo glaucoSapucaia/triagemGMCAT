@@ -53,11 +53,14 @@ def criar_driver(pasta_indice=None, caminho_perfil=None, nome_perfil="Default"):
 
 
 def main():
+    """
+    Função principal que orquestra a coleta de dados e geração de relatórios.
+    """
     try:
-        # Interface coleta credenciais e índices
+        # Interface inicial que coleta credenciais e índices
         credenciais, indices = iniciar_interface()
 
-        # Timestamp legível
+        # Timestamp legível para a pasta resultados
         timestamp_legivel = datetime.now().strftime("Resultados - %d de %B de %Y %Hh%M")
         pasta_resultados = timestamp_legivel
         os.makedirs(pasta_resultados, exist_ok=True)
@@ -69,7 +72,7 @@ def main():
 
                 logging.info(f"Iniciando coleta para índice: {indice}")
 
-                # --- Sistema 1: Siatu ---
+                # Sistema 1: Siatu (PB e Anexos)
                 driver_siatu = criar_driver(
                     pasta_indice,
                     caminho_perfil=r"C:\Users\glauc\AppData\Local\Google\Chrome\SeleniumProfile",
@@ -88,13 +91,13 @@ def main():
 
                     if siatu.acessar() and siatu.login() and siatu.navegar():
                         dados_PB = siatu.planta_basica(indice)
-                        anexos_count = siatu.download_anexos(indice)  # número de anexos
+                        anexos_count = siatu.download_anexos(indice)
 
                     logging.info(f"Sistema 1 concluído para índice {indice}")
                 finally:
                     driver_siatu.quit()
 
-                # --- Sistema 2: Urbano ---
+                # Sistema 2: Urbano (Projeto, Alvará e Baixa de Construção)
                 driver_urbano = criar_driver(pasta_indice)
                 try:
                     urbano = UrbanoAuto(
@@ -107,15 +110,13 @@ def main():
 
                     projetos_count = 0
                     if urbano.acessar() and urbano.login():
-                        projetos_count, dados_projeto = urbano.download_projeto(
-                            indice
-                        )  # número de projetos
+                        projetos_count, dados_projeto = urbano.download_projeto(indice)
 
                     logging.info(f"Sistema 2 concluído para índice {indice}")
                 finally:
                     driver_urbano.quit()
 
-                # --- Gerar relatório PDF ---
+                # Gera o relatório PDF
                 pdf_path = os.path.join(
                     pasta_indice, f"Relatório de Triagem - {indice}.pdf"
                 )
@@ -134,7 +135,7 @@ def main():
             except Exception as e:
                 logging.error(f"Erro no processamento do índice {indice}: {e}")
 
-        # --- Abrir pasta resultados após processar todos os índices ---
+        # Abri a pasta resultados após processar todos os índices
         if os.path.exists(pasta_resultados):
             logging.info(f"Abrindo pasta de resultados: {pasta_resultados}")
             os.startfile(pasta_resultados)

@@ -40,7 +40,7 @@ class UrbanoAuto:
         try:
             logger.info("Iniciando login no Urbano")
 
-            # Clicar no botão de acesso
+            # Clica no botão de acesso
             btn_acesso = self.wait.until(
                 EC.element_to_be_clickable(
                     (By.XPATH, "//div[@class='panel-body' and text()='Acesso PBH']")
@@ -49,21 +49,21 @@ class UrbanoAuto:
             self._click(btn_acesso)
             logger.info("Botão 'Acesso PBH' clicado")
 
-            # Preencher usuário
+            # Preenche usuário
             campo_usuario = self.wait.until(
                 EC.presence_of_element_located((By.ID, "usuario"))
             )
             campo_usuario.clear()
             campo_usuario.send_keys(self.usuario)
 
-            # Preencher senha
+            # Preenche senha
             campo_senha = self.wait.until(
                 EC.presence_of_element_located((By.ID, "senha"))
             )
             campo_senha.clear()
             campo_senha.send_keys(self.senha)
 
-            # Confirmar login
+            # Confirma login
             btn_login = self.wait.until(
                 EC.element_to_be_clickable(
                     (By.XPATH, "//input[@type='submit' and @name='Login']")
@@ -80,7 +80,7 @@ class UrbanoAuto:
     def download_projeto(self, indice: str):
         """
         Pesquisa o projeto no Urbano e retorna a quantidade de projetos encontrados.
-        Também salva prints e tenta baixar certidão de baixa ou alvará se existirem.
+        Também salva prints e tenta baixar certidão de baixa, alvará ou projeto se existirem.
         """
         try:
             logger.info("Iniciando pesquisa de projeto para índice: %s", indice)
@@ -91,7 +91,7 @@ class UrbanoAuto:
             # Divisão do índice
             parte1, parte2, parte3 = indice[0:3], indice[3:7], indice[7:11]
 
-            # --- Preencher campos ---
+            # Preenche campos
             campo1 = self.wait.until(
                 EC.presence_of_element_located((By.NAME, "zonaFiscal"))
             )
@@ -108,18 +108,20 @@ class UrbanoAuto:
             campo3.clear()
             campo3.send_keys(parte3)
 
-            # --- Pesquisar ---
+            # Realiza pesquisa
             btn_pesquisar = self.wait.until(
                 EC.element_to_be_clickable((By.ID, "btnPesquisar"))
             )
             self._click(btn_pesquisar)
-            time.sleep(10)  # Aguarda resultados Angular
+            time.sleep(12)  # Aguarda página carregar
+
+            # Scroll para o print (caso necessário)
             self.driver.execute_script(
                 "window.scrollTo(0, document.body.scrollHeight);"
             )
-            time.sleep(4)  # Aguarda scroll
+            time.sleep(2)  # Aguarda scroll
 
-            # --- Verificar tabela e contar projetos ---
+            # Verifica a tabela e conta projetos
             try:
                 tabela_div = self.driver.find_element(
                     By.CSS_SELECTOR,
@@ -134,7 +136,7 @@ class UrbanoAuto:
                         nome_arquivo="Não informado"
                     )
 
-                    # --- Print da pesquisa ---
+                    # Print da pesquisa sem resultados
                     screenshot_path = os.path.join(
                         self.pasta_download, "Pesquisa de Projeto.png"
                     )
@@ -143,11 +145,13 @@ class UrbanoAuto:
 
                     return 0, dados_projeto
 
-                # --- Clicar no primeiro projeto para tentar baixar documentos ---
+                # Clica no primeiro projeto para tentar baixar documentos
                 primeiro_projeto = linhas[0].find_element(By.TAG_NAME, "a")
                 self._click(primeiro_projeto)
                 logger.info("Clicado no primeiro projeto da lista")
-                time.sleep(15)  # Aguarda carregar página do projeto
+                time.sleep(
+                    20
+                )  # Aguarda carregar a página do projeto (geralmente demora)
 
             except NoSuchElementException:
                 logger.info("Tabela de resultados não encontrada")
@@ -155,7 +159,7 @@ class UrbanoAuto:
                     nome_arquivo="Não informado"
                 )
 
-                # --- Print da pesquisa ---
+                # Print da pesquisa em caso de erros
                 screenshot_path = os.path.join(
                     self.pasta_download, "Pesquisa de Projeto.png"
                 )
@@ -164,7 +168,7 @@ class UrbanoAuto:
 
                 return 0, dados_projeto
 
-            # --- Tentar baixar certidão de baixa ---
+            # Tenta baixar certidão de baixa
             certidao = self.driver.find_elements(
                 By.XPATH,
                 "//a[contains(@href,'certidao-de-baixa') and text()='visualizar']",
@@ -178,7 +182,7 @@ class UrbanoAuto:
                 )
                 return qtd_projetos, dados_projeto
 
-            # --- Tentar baixar alvará ---
+            # Tenta baixar alvará
             alvara = self.driver.find_elements(
                 By.XPATH,
                 "//a[contains(text(),'visualizar') and @ng-click='statusCtrl.abrirAlvara()']",
@@ -192,9 +196,9 @@ class UrbanoAuto:
                 )
                 return qtd_projetos, dados_projeto
 
-            # --- Se nenhum documento encontrado, salvar print ---
+            # Se nenhum documento encontrado, salvar print e acessa "Documentos Anexos"
             if not certidao and not alvara:
-                time.sleep(4)
+                time.sleep(10)  # Espera extra para garantir carregamento
                 screenshot_sem_doc = os.path.join(
                     self.pasta_download, "Sem Alvara-Baixa.png"
                 )
@@ -204,7 +208,7 @@ class UrbanoAuto:
                     screenshot_sem_doc,
                 )
 
-                # --- Clicar em "Documentos Anexos" ---
+                # Clica em "Documentos Anexos"
                 try:
                     documentos_anexos = self.wait.until(
                         EC.element_to_be_clickable(
@@ -221,8 +225,9 @@ class UrbanoAuto:
                         nome_arquivo="Não informado"
                     )
 
-                # --- Aguardar aparecer o painel "Pranchas do Projeto" ---
+                # Aguarda aparecer o painel "Pranchas do Projeto"
                 try:
+                    time.sleep(15)  # Espera extra para garantir carregamento
                     self.wait.until(
                         EC.presence_of_element_located(
                             (By.XPATH, "//h3[contains(text(),'Pranchas do Projeto')]")
@@ -235,7 +240,7 @@ class UrbanoAuto:
                         nome_arquivo="Não informado"
                     )
 
-                # --- Clicar no primeiro arquivo da tabela ---
+                # Clica no primeiro arquivo da tabela
                 try:
                     primeiro_arquivo = self.wait.until(
                         EC.presence_of_element_located(
@@ -261,7 +266,8 @@ class UrbanoAuto:
                         )
 
                     logger.info("Download iniciado para: %s", nome_arquivo)
-                    time.sleep(10)
+                    time.sleep(10)  # Espera download
+
                     dados_projeto = self._capturar_dados_projeto(nome_arquivo="Projeto")
                     return qtd_projetos, dados_projeto
                 except TimeoutException:
@@ -287,11 +293,11 @@ class UrbanoAuto:
         dados = {}
         time.sleep(2)  # Pequena espera para garantir carregamento
 
-        # 1. Tipo: nome do arquivo
+        # Tipo: nome do arquivo
         dados["tipo"] = nome_arquivo if nome_arquivo else "Não informado"
 
         try:
-            # 2. Requerimento
+            # Requerimento
             requerimento_elem = self.driver.find_element(
                 By.XPATH,
                 "//span[@ng-if='$ctrl.ps.modoVisualizacao() || !$ctrl.isNomeEditavel']",
@@ -311,7 +317,7 @@ class UrbanoAuto:
             dados["ultima_alteracao"] = "Não informado"
 
         try:
-            # 4. Área do(s) lote(s)
+            # Área do(s) lote(s)
             area_lote_elem = self.driver.find_element(
                 By.XPATH,
                 "//p[@class='form-control-static ng-binding']//span[@class='ng-binding']",

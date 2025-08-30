@@ -17,7 +17,7 @@ from datetime import datetime
 
 
 def normalizar_nome(arq: str) -> str:
-    """Substitui qualquer caractere fora de A–Z, a–z, 0–9, _, . ou - por '_'."""
+    """Substitui qualquer caractere fora de AZ, az, 09, _, . ou - por '_'."""
     return re.sub(r"[^A-Za-z0-9_.-]", "_", arq)
 
 
@@ -31,6 +31,9 @@ def gerar_relatorio(
     dados_planta=None,
     dados_projeto=None,
 ):
+    """
+    Gera um relatório PDF com base nos dados fornecidos.
+    """
     doc = SimpleDocTemplate(
         nome_pdf,
         pagesize=A4,
@@ -82,7 +85,7 @@ def gerar_relatorio(
         underline=True,
     )
 
-    # --- Cabeçalho ---
+    # Cabeçalho
     titulo = f"Relatório de Triagem - IC {indice_cadastral}"
     elementos.append(Paragraph(titulo, estilo_titulo))
     data_atual = datetime.now().strftime("%d/%m/%Y %H:%M")
@@ -102,10 +105,10 @@ def gerar_relatorio(
             elementos.append(Paragraph(texto_secao, estilo_texto))
         elementos.append(Spacer(1, 12))
 
-    # >>> AQUI está o pulo do gato: prefixo "./" no href <<<
+    # Adiciona anexos às seções com o prefixo "./" no href (para abrir localmente com links relativos)
     def adicionar_anexos(lista_arquivos):
         for arq in lista_arquivos:
-            # arq já está normalizado; ainda assim, aplicamos quote por segurança
+            # Normaliza o do nome do arquivo para o link
             href = "./" + quote(
                 arq,
                 safe="._-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
@@ -113,7 +116,7 @@ def gerar_relatorio(
             elementos.append(Paragraph(f'<a href="{href}">{arq}</a>', estilo_link))
             elementos.append(Spacer(1, 5))
 
-    # --- Preparar anexos (com renomeação no disco para nomes seguros) ---
+    # Prepara anexos (com renomeação no disco para nomes seguros)
     anexos_planta, anexos_siatu, anexos_projetos = [], [], []
 
     if pasta_anexos and os.path.exists(pasta_anexos):
@@ -134,12 +137,12 @@ def gerar_relatorio(
                     os.rename(src, dst)
                     nome_norm = os.path.basename(dst)
                 except Exception:
-                    # Se não conseguir renomear, segue com o nome original (mas o link pode falhar)
+                    # Se não conseguir renomear, segue com o nome original
                     nome_norm = arq
 
-            arq = nome_norm  # usar o nome final
+            arq = nome_norm
 
-            # Classificação
+            # Classificação dos anexos
             if "Planta_Basica" in arq:
                 anexos_planta.append(arq)
             elif (
@@ -152,7 +155,8 @@ def gerar_relatorio(
             else:
                 anexos_siatu.append(arq)
 
-    # --- Seções ---
+    # Seções
+    # COL
     adicionar_secao(
         "1. Certidão de Origem de Lote",
         "Verifique se a COL está na lista de anexos Siatu. "
@@ -170,16 +174,19 @@ def gerar_relatorio(
     else:
         texto_planta = "Planta Básica não encontrada."
 
+    # PB
     adicionar_secao(
         "2. Planta Básica - Exercício seguinte ou Primeiro do Ano", texto_planta
     )
     adicionar_anexos(anexos_planta)
 
+    # ANEXOS SIATU
     adicionar_secao(
         "3. Croqui e Anexos Siatu", f"{anexos_count} anexo(s) encontrado(s)."
     )
     adicionar_anexos(anexos_siatu)
 
+    # PROJETO, ALVARÁ E BAIXA DE CONSTRUÇÃO
     texto_projeto = f"{projetos_count} anexo(s) encontrado(s)."
     if dados_projeto:
         texto_projeto += "<br/>"
@@ -192,6 +199,7 @@ def gerar_relatorio(
     adicionar_secao("4. Projeto, Alvará e Baixa de Construção", texto_projeto)
     adicionar_anexos(anexos_projetos)
 
+    # MATRÍCULA E CARTÓRIO
     if dados_planta:
         texto_matricula = f"""
         <b>Número:</b> {dados_planta.get('matricula_registro', 'Não informado')}<br/>
@@ -201,6 +209,7 @@ def gerar_relatorio(
         texto_matricula = "Não informado"
     adicionar_secao("5. Matrícula do Imóvel", texto_matricula)
 
+    # MORADORES (BASE CEMIG)
     adicionar_secao("6. Moradores Ocupantes", "Pesquisa realizada na base da CEMIG.")
     moradores = ["Morador 1 exemplo", "Morador 2 exemplo"]
     lista_moradores = ListFlowable(
@@ -211,8 +220,11 @@ def gerar_relatorio(
     elementos.append(lista_moradores)
     elementos.append(Spacer(1, 12))
 
+    # OBSERVAÇÕES
     adicionar_secao("7. Observações Gerais", "Observações de exemplo.")
+
+    # CONCLUSÃO
     adicionar_secao("8. Conclusão Parcial", "Conclusão de exemplo.")
 
-    # --- Gerar PDF ---
+    # Gera o PDF
     doc.build(elementos)
