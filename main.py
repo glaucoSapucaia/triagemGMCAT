@@ -1,5 +1,7 @@
 import logging
 import os
+import sys
+import subprocess
 from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -135,15 +137,31 @@ def main():
             except Exception as e:
                 logging.error(f"Erro no processamento do índice {indice}: {e}")
 
-        # Abri a pasta resultados após processar todos os índices
+        # Abri a pasta resultados após processar todos os índices (Apneas windows)
+        # if os.path.exists(pasta_resultados):
+        #     logging.info(f"Abrindo pasta de resultados: {pasta_resultados}")
+        #     os.startfile(pasta_resultados)
+        # else:
+        #     logging.warning(f"Pasta de resultados não encontrada: {pasta_resultados}")
+
+        # Abri pasta com OS dinâmico
         if os.path.exists(pasta_resultados):
             logging.info(f"Abrindo pasta de resultados: {pasta_resultados}")
-            os.startfile(pasta_resultados)
+            abrir_pasta(pasta_resultados)
         else:
             logging.warning(f"Pasta de resultados não encontrada: {pasta_resultados}")
 
     except Exception as e:
         logging.critical(f"Erro crítico no main: {e}")
+
+
+def abrir_pasta(path):
+    if sys.platform.startswith("win"):  # Windows
+        os.startfile(path)
+    elif sys.platform.startswith("darwin"):  # macOS
+        subprocess.Popen(["open", path])
+    else:  # Linux
+        subprocess.Popen(["xdg-open", path])
 
 
 if __name__ == "__main__":

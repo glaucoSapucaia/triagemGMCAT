@@ -2,3 +2,6 @@ venv/
 __pycache__/
 Resultados*/
 logs.*
+
+# Pasta criada na execução do ubuntu com confiurações windows.
+C:*

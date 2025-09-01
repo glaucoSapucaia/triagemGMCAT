@@ -162,7 +162,8 @@ def gerar_relatorio(
         "Verifique se a COL está na lista de anexos Siatu. "
         "<br/>Caso não a encontre, busque manualmente a certidão de origem de lote (COL). "
         "<br/><b>Informação obtida no portal:</b> "
-        '<font color="blue"><u>https://siurbe.pbh.gov.br/#/solicitacao/CertidaoOrigemLote</u></font>',
+        '<a href="https://siurbe.pbh.gov.br/#/solicitacao/CertidaoOrigemLote">'
+        '<font color="blue"><u>https://siurbe.pbh.gov.br/#/solicitacao/CertidaoOrigemLote</u></font></a>',
     )
 
     if dados_planta:
