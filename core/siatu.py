@@ -113,7 +113,7 @@ class SiatuAuto:
             )
             self._click(campo_exercicio)
             logger.info("Exercício clicado")
-            time.sleep(2)  # tempo para a página recarregar
+            time.sleep(2)
 
             # Clica no botão "planta básica"
             btn_planta = self.wait.until(
@@ -123,59 +123,55 @@ class SiatuAuto:
             )
             self._click(btn_planta)
             logger.info("Botão 'planta básica' clicado")
-            time.sleep(2)  # tempo para a página recarregar
+            time.sleep(2)
 
-            # Verifica se existe "Exercício Seguinte", se não usa "Primeiro do Ano"
-            try:
-                link_exercicio = self.wait.until(
-                    EC.element_to_be_clickable(
-                        (By.XPATH, "//a[contains(text(),'Exercício Seguinte')]")
-                    )
-                )
-                self._click(link_exercicio)
-                logger.info("Link 'Exercício Seguinte' clicado")
-            except TimeoutException:
-                link_primeiro = self.wait.until(
-                    EC.element_to_be_clickable(
-                        (By.XPATH, "//a[contains(text(),'Primeiro do Ano')]")
-                    )
-                )
-                self._click(link_primeiro)
-                logger.info("Link 'Primeiro do Ano' clicado")
-
-            time.sleep(2)  # tempo para a página recarregar
+            # Links que podem existir
+            links_xpaths = {
+                "Exercício Seguinte": "//a[contains(text(),'Exercício Seguinte')]",
+                "Recalculado": "//a[contains(@href, 'tipoRegistro=Recalculado')]",
+                "Primeiro do Ano": "//a[contains(text(),'Primeiro do Ano')]",
+            }
 
             dados_PB = self._capturar_dados_imovel()
 
-            time.sleep(2)  # tempo entre processos
+            for nome, xpath in links_xpaths.items():
+                try:
+                    # Tenta localizar o link
+                    link = self.wait.until(
+                        EC.presence_of_element_located((By.XPATH, xpath))
+                    )
+                    self._click(link)
+                    logger.info(f"Link '{nome}' clicado")
+                    time.sleep(2)
 
-            # Clica no link "Gera Planta Básica Resumida"
-            link_planta_resumida = self.wait.until(
-                EC.element_to_be_clickable(
-                    (By.XPATH, "//a[contains(text(),'Gera Planta Básica Resumida')]")
-                )
-            )
+                    # Após clicar no link, dispara o download
+                    link_planta_resumida = self.wait.until(
+                        EC.element_to_be_clickable(
+                            (
+                                By.XPATH,
+                                "//a[contains(text(),'Gera Planta Básica Resumida')]",
+                            )
+                        )
+                    )
 
-            # Guarda a janela principal
-            janela_principal = self.driver.current_window_handle
+                    janela_principal = self.driver.current_window_handle
+                    self._click(link_planta_resumida)
+                    logger.info(f"Download da PB disparado após '{nome}'")
+                    time.sleep(2)
 
-            self._click(link_planta_resumida)
-            logger.info(
-                "Link 'Gera Planta Básica Resumida' clicado — download disparado"
-            )
+                    # Fecha qualquer janela nova aberta
+                    janelas_atuais = self.driver.window_handles
+                    for janela in janelas_atuais:
+                        if janela != janela_principal:
+                            self.driver.switch_to.window(janela)
+                            self.driver.close()
 
-            time.sleep(2)  # tempo para o download iniciar
+                    self.driver.switch_to.window(janela_principal)
+                    time.sleep(2)
 
-            # Fecha qualquer janela nova aberta
-            janelas_atuais = self.driver.window_handles
-            for janela in janelas_atuais:
-                if janela != janela_principal:
-                    self.driver.switch_to.window(janela)
-                    self.driver.close()
+                except TimeoutException:
+                    logger.info(f"Link '{nome}' não encontrado, seguindo...")
 
-            # Volta para a janela principal
-            self.driver.switch_to.window(janela_principal)
-            time.sleep(2)  # tempo para o download finalizar
             return dados_PB
 
         except TimeoutException as e:

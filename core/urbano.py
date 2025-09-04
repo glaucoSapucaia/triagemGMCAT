@@ -160,9 +160,7 @@ class UrbanoAuto:
                 )
 
                 # Print da pesquisa em caso de erros
-                screenshot_path = os.path.join(
-                    self.pasta_download, "Pesquisa de Projeto.png"
-                )
+                screenshot_path = os.path.join(self.pasta_download, "Sem_Projeto.png")
                 self.driver.save_screenshot(screenshot_path)
                 logger.info("Print da tela salvo em: %s", screenshot_path)
 

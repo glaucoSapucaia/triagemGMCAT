@@ -146,7 +146,7 @@ def gerar_relatorio(
             if "Planta_Basica" in arq:
                 anexos_planta.append(arq)
             elif (
-                arq.lower().endswith(".png")
+                "sem_projeto" in arq.lower()
                 or "certidao_baixa" in arq.lower()
                 or "alvara_construcao" in arq.lower()
                 or "projeto" in arq.lower()
@@ -177,7 +177,8 @@ def gerar_relatorio(
 
     # PB
     adicionar_secao(
-        "2. Planta Básica - Exercício seguinte ou Primeiro do Ano", texto_planta
+        "2. Planta Básica - Exercício Seguinte e/ou Recalculado e/ou Primeiro do Ano",
+        texto_planta,
     )
     adicionar_anexos(anexos_planta)
 
