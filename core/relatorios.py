@@ -1,5 +1,6 @@
 import os
 import re
+from reportlab.platypus import Table, TableStyle
 from reportlab.lib.pagesizes import A4
 from urllib.parse import quote
 from reportlab.platypus import (
@@ -23,13 +24,14 @@ def normalizar_nome(arq: str) -> str:
 
 def gerar_relatorio(
     indice_cadastral,
-    anexos_count,
-    projetos_count,
+    anexos_count=None,
+    projetos_count=None,
     pasta_anexos=None,
     prps_trabalhador="Nome do trabalhador",
     nome_pdf="relatorio_profissional.pdf",
     dados_planta=None,
     dados_projeto=None,
+    dados_sisctm=None,
 ):
     """
     Gera um relatório PDF com base nos dados fornecidos.
@@ -117,7 +119,7 @@ def gerar_relatorio(
             elementos.append(Spacer(1, 5))
 
     # Prepara anexos (com renomeação no disco para nomes seguros)
-    anexos_planta, anexos_siatu, anexos_projetos = [], [], []
+    anexos_planta, anexos_siatu, anexos_projetos, anexos_sisctm = [], [], [], []
 
     if pasta_anexos and os.path.exists(pasta_anexos):
         for arq in sorted(os.listdir(pasta_anexos)):
@@ -152,6 +154,8 @@ def gerar_relatorio(
                 or "projeto" in arq.lower()
             ):
                 anexos_projetos.append(arq)
+            elif "CTM" in arq:
+                anexos_sisctm.append(arq)
             else:
                 anexos_siatu.append(arq)
 
@@ -227,6 +231,36 @@ def gerar_relatorio(
 
     # CONCLUSÃO
     adicionar_secao("8. Conclusão Parcial", "Conclusão de exemplo.")
+
+    # 9. SISCTM
+    if dados_sisctm:
+        adicionar_secao("9. Dados SISCTM")
+
+        # Adiciona os anexos SISCTM
+        if anexos_sisctm:
+            adicionar_anexos(anexos_sisctm)
+
+        # Constrói a tabela a partir do dicionário
+        data = [["Chave", "Valor"]]
+        for chave, valor in dados_sisctm.items():
+            data.append([chave, valor])
+
+        tabela = Table(data, colWidths=[150, 350])
+        tabela.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.lightblue),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 10),
+                    ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                ]
+            )
+        )
+        elementos.append(tabela)
+        elementos.append(Spacer(1, 12))
 
     # Gera o PDF
     doc.build(elementos)

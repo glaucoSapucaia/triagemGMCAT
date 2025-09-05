@@ -6,7 +6,7 @@ from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from interface import iniciar_interface
-from core import SiatuAuto, UrbanoAuto, gerar_relatorio
+from core import SiatuAuto, UrbanoAuto, SisctmAuto, gerar_relatorio
 import locale
 
 # Define a localidade para português do Brasil
@@ -118,6 +118,24 @@ def main():
                 finally:
                     driver_urbano.quit()
 
+                # Sistema 3: SISCTM (Dados gerais do imóvel)
+                driver_sistcm = criar_driver(pasta_indice)
+                try:
+                    sisctm = SisctmAuto(
+                        driver=driver_sistcm,
+                        url="https://acesso.pbh.gov.br/auth/realms/PBH/protocol/openid-connect/auth?client_id=sisctm-mapa&redirect_uri=https%3A%2F%2Fsisctm.pbh.gov.br%2Fmapa%2Flogin&state=9ac6fe5e-84df-4a25-97b4-b8f3a2a49c83&response_mode=fragment&response_type=code&scope=openid&nonce=d9b8a792-a2e7-431f-819c-ca77096dbaf5",
+                        usuario=credenciais["usuario"],
+                        senha=credenciais["senha"],
+                        pasta_download=pasta_indice,
+                    )
+
+                    if sisctm.login() and sisctm.navegar(indice):
+                        dados_sisctm = sisctm.informacoes_sisctm()
+
+                    logging.info(f"Sistema 3 concluído para índice {'indice'}")
+                finally:
+                    driver_sistcm.quit()
+
                 # Gera o relatório PDF
                 pdf_path = os.path.join(
                     pasta_indice, f"Relatório de Triagem - {indice}.pdf"
@@ -131,6 +149,7 @@ def main():
                     nome_pdf=pdf_path,
                     dados_planta=dados_PB,
                     dados_projeto=dados_projeto,
+                    dados_sisctm=dados_sisctm,
                 )
                 logging.info(f"Relatório gerado: {pdf_path}")
 
