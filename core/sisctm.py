@@ -1,8 +1,14 @@
 import logging
 import time
 import os
+from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.keys import Keys
-from selenium.common.exceptions import WebDriverException, TimeoutException
+from selenium.common.exceptions import (
+    WebDriverException,
+    TimeoutException,
+    NoSuchElementException,
+    ElementClickInterceptedException,
+)
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -79,7 +85,7 @@ class SisctmAuto:
             logger.error("Erro no login do Keycloak PBH: %s", e)
             return False
 
-    def navegar(self, indice_cadastral) -> bool:
+    def ativar_camadas(self, indice_cadastral) -> bool:
         """Navega pelo menu do sistema Sisctm PBH."""
         try:
             logger.info("Iniciando navegação pelo sistema")
@@ -135,6 +141,92 @@ class SisctmAuto:
             self._click(btn_camadas)
             logger.info("Camadas abertas")
             time.sleep(1)
+
+            # CAMADA ENDEREÇO -----------------------------------------
+
+            # Seleciona o item "Endereço" no menu principal
+            menu_endereco = self.wait.until(
+                EC.presence_of_element_located((By.XPATH, "//div[text()='Endereço']"))
+            )
+            self.driver.execute_script(
+                "arguments[0].scrollIntoView({block: 'center'});", menu_endereco
+            )
+            time.sleep(0.3)
+            self._click(menu_endereco)
+            logger.info("Menu 'Endereço' selecionado")
+            time.sleep(0.5)
+
+            # Localiza o container da camada "Endereço"
+            container_endereco = self.wait.until(
+                EC.presence_of_element_located(
+                    (
+                        By.XPATH,
+                        "//div[text()='Endereço']/ancestor::div[contains(@class,'q-tree__node')]",
+                    )
+                )
+            )
+
+            # Localiza o checkbox do item "Endereço PBH" pelo src da imagem
+            endereco_pbh_checkbox = container_endereco.find_element(
+                By.XPATH,
+                ".//div[contains(@class,'q-tree__node--child')]"
+                "[.//img[contains(@src,'FazendaEnderecoPBH')]]"
+                "//div[contains(@class,'q-checkbox')]",
+            )
+
+            # Rola até ele e clica
+            self.driver.execute_script(
+                "arguments[0].scrollIntoView({block: 'center'});", endereco_pbh_checkbox
+            )
+            time.sleep(0.3)
+            self._click(endereco_pbh_checkbox)
+            logger.info("Camada 'Endereço PBH' marcada")
+            time.sleep(0.5)
+
+            # CAMADA PARCELAMENTO DO SOLO -----------------------------------------
+
+            # 1. Seleciona o item "Parcelamento do Solo" no menu principal
+            menu_parcelamento = self.wait.until(
+                EC.presence_of_element_located(
+                    (By.XPATH, "//div[text()='Parcelamento do Solo']")
+                )
+            )
+            self.driver.execute_script(
+                "arguments[0].scrollIntoView({block: 'center'});", menu_parcelamento
+            )
+            time.sleep(0.3)
+            self._click(menu_parcelamento)
+            logger.info("Menu 'Parcelamento do Solo' selecionado")
+            time.sleep(0.5)
+
+            # 2. Localiza o container da camada "Parcelamento do Solo"
+            container_parcelamento = self.wait.until(
+                EC.presence_of_element_located(
+                    (
+                        By.XPATH,
+                        "//div[text()='Parcelamento do Solo']/ancestor::div[contains(@class,'q-tree__node')]",
+                    )
+                )
+            )
+
+            # 3. Localiza o checkbox do item "Lote CP - ATIVO" pelo src da imagem
+            lote_cp_checkbox = container_parcelamento.find_element(
+                By.XPATH,
+                ".//div[contains(@class,'q-tree__node--child')]"
+                "[.//img[contains(@src,'FazendaLoteCP')]]"
+                "//div[contains(@class,'q-checkbox')]",
+            )
+
+            # 4. Rola até ele e clica
+            self.driver.execute_script(
+                "arguments[0].scrollIntoView({block: 'center'});", lote_cp_checkbox
+            )
+            time.sleep(0.3)
+            self._click(lote_cp_checkbox)
+            logger.info("Camada 'Lote CP - ATIVO' marcada")
+            time.sleep(0.5)
+
+            # CAMADA TRIBUTÁRIO E FILTRO -----------------------------------------
 
             # 5. Seleciona a camada "Tributário"
             camada_tributario = self.wait.until(
@@ -231,44 +323,14 @@ class SisctmAuto:
 
             # Fecha a janela do filtro
             self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
-            time.sleep(0.5)
+            time.sleep(5)
             logger.info("Janela do filtro fechada")
 
-            # Print da pesquisa em caso de erros
-            screenshot_path = os.path.join(self.pasta_download, "CTM_Aereo.png")
-            self.driver.save_screenshot(screenshot_path)
-            logger.info("Print da tela salvo em: %s", screenshot_path)
+            # PRINTS
+            self._prints_aereo()
 
-            # 1. Clica no elemento "BHMap"
-            elemento_bhmap = self.wait.until(
-                EC.element_to_be_clickable(
-                    (
-                        By.XPATH,
-                        "//div[@class='q-img__content absolute-full']//div[@class='titulo ellipsis' and text()='BHMap']",
-                    )
-                )
-            )
-            self._click(elemento_bhmap)
-            logger.info("Elemento 'BHMap' clicado")
-            time.sleep(1)
-
-            # 2. Seleciona a ortofoto 2025 (ou 2015 no seu exemplo)
-            elemento_ortofoto = self.wait.until(
-                EC.element_to_be_clickable(
-                    (
-                        By.XPATH,
-                        "//div[@class='q-img__content absolute-full']//div[contains(@class,'ellipsis') and text()='Ortofoto 2015']",
-                    )
-                )
-            )
-            self._click(elemento_ortofoto)
-            logger.info("Ortofoto selecionada")
-            time.sleep(5)
-
-            # 3. Novo print da tela
-            screenshot_path_orto = os.path.join(self.pasta_download, "CTM_Orto.png")
-            self.driver.save_screenshot(screenshot_path_orto)
-            logger.info("Print da tela salvo em: %s", screenshot_path_orto)
+            # Clique no lote canvas (mapa)
+            self._clique_centro_mapa()
 
             return True
 
@@ -276,86 +338,236 @@ class SisctmAuto:
             logger.error("Erro ao navegar no sistema Sisctm PBH: %s", e)
             return False
 
-    def informacoes_sisctm(self) -> dict:
-        """Coleta informações do lote filtrado no Sisctm PBH."""
-        try:
-            logger.info("Iniciando coleta de informações do Sisctm")
+    def _prints_aereo(self) -> None:
+        # Print AEREO CTM
+        screenshot_path = os.path.join(self.pasta_download, "CTM_Aereo.png")
+        self.driver.save_screenshot(screenshot_path)
+        logger.info("Print da tela salvo em: %s", screenshot_path)
 
-            # Localiza o container da camada Tributário
-            camada_tributario_container = self.wait.until(
-                EC.presence_of_element_located(
-                    (
-                        By.XPATH,
-                        "//div[text()='Tributário']/ancestor::div[contains(@class,'q-tree__node')]",
+        # Clica no elemento "BHMap"
+        elemento_bhmap = self.wait.until(
+            EC.element_to_be_clickable(
+                (
+                    By.XPATH,
+                    "//div[@class='q-img__content absolute-full']//div[@class='titulo ellipsis' and text()='BHMap']",
+                )
+            )
+        )
+        self._click(elemento_bhmap)
+        logger.info("Elemento 'BHMap' clicado")
+        time.sleep(1)
+
+        # Seleciona a ortofoto 2025 (ou 2015 no seu exemplo)
+        elemento_ortofoto = self.wait.until(
+            EC.element_to_be_clickable(
+                (
+                    By.XPATH,
+                    "//div[@class='q-img__content absolute-full']//div[contains(@class,'ellipsis') and text()='Ortofoto 2015']",
+                )
+            )
+        )
+        self._click(elemento_ortofoto)
+        logger.info("Ortofoto selecionada")
+        time.sleep(5)
+
+        # Print AEREO ORTO
+        screenshot_path_orto = os.path.join(self.pasta_download, "CTM_Orto.png")
+        self.driver.save_screenshot(screenshot_path_orto)
+        logger.info("Print da tela salvo em: %s", screenshot_path_orto)
+
+        return
+
+    def _clique_centro_mapa(self):
+        try:
+            logging.info("Iniciando tentativa de clique no centro do mapa")
+
+            # tenta localizar o viewport do mapa
+            viewport = self.driver.find_element(By.CSS_SELECTOR, "#olmap .ol-viewport")
+            logging.info(
+                f"Viewport encontrado: tamanho {viewport.size['width']}x{viewport.size['height']}"
+            )
+
+            # cria a ação de mover e clicar
+            action = ActionChains(self.driver)
+            action.move_to_element(viewport).click().perform()
+            logging.info("Clique no centro do mapa realizado com ActionChains")
+
+            # espera o mapa processar o clique (carregamento de layers ou overlays)
+            time.sleep(5)
+            logging.info("Espera pós-clique concluída")
+
+        except NoSuchElementException as e:
+            logging.error(f"Elemento do mapa não encontrado: {e}")
+        except WebDriverException as e:
+            logging.error(f"Erro ao executar clique no mapa: {e}")
+        except Exception as e:
+            logging.error(f"Erro inesperado ao clicar no mapa: {e}")
+
+    def capturar_areas(self):
+        resultado = {}
+        try:
+            logging.info("Iniciando captura de áreas do painel lateral")
+
+            painel = self.driver.find_element(
+                By.CSS_SELECTOR,
+                "#q-app > div > div.q-drawer-container > aside > div > div.fit.row.no-scroll > div.col.bg-white > div > div.col.relative-position > div",
+            )
+
+            # Função auxiliar para ativar item
+            def ativar_item(nome_item):
+                item = painel.find_element(
+                    By.XPATH,
+                    f".//div[contains(@class,'q-item') and .//div[contains(text(),'{nome_item}')]]",
+                )
+                botao = item.find_element(By.XPATH, ".//div[@role='button']")
+                aria = botao.get_attribute("aria-expanded")
+                if aria != "true":
+                    logging.info(f"{nome_item} não está ativo. Ativando...")
+                    botao.click()
+                    WebDriverWait(botao, 5).until(
+                        lambda x: x.get_attribute("aria-expanded") == "true"
+                    )
+                    logging.info(f"{nome_item} ativado")
+                    time.sleep(3)
+                else:
+                    logging.info(f"{nome_item} já está ativo")
+                return item
+
+            # --- IPTU CTM GEO ---
+            iptu_item = ativar_item("IPTU CTM GEO")
+
+            # Aguarda a linha com "ÁREA" existir
+            try:
+                linha_area = WebDriverWait(iptu_item, 5).until(
+                    EC.presence_of_element_located(
+                        (By.XPATH, ".//table//tr[td[contains(text(),'ÁREA')]]/td[2]")
                     )
                 )
-            )
-
-            # Busca todos os ícones more_vert dentro dessa camada
-            more_vert_icons = camada_tributario_container.find_elements(
-                By.XPATH,
-                ".//i[@class='q-icon notranslate material-icons' and text()='more_vert']",
-            )
-
-            # Verifica se existe o quarto ícone (IPTU CTM GEO)
-            if len(more_vert_icons) >= 4:
-                vert_icon = more_vert_icons[3]
-            else:
-                logger.error(
-                    "Não foi encontrado o quarto ícone more_vert dentro da camada Tributário"
+                resultado["iptu_ctm_geo_area_do_terreno"] = linha_area.text.strip()
+                logging.info(
+                    f"Valor capturado IPTU CTM GEO: {resultado['iptu_ctm_geo_area_do_terreno']}"
                 )
-                return {}
+            except TimeoutException:
+                logging.warning("Não foi possível capturar área IPTU CTM GEO")
+                resultado["iptu_ctm_geo_area_do_terreno"] = None
 
-            # 1. Localiza o elemento 'IPTU CTM GEO' relativo ao ícone
-            elemento_iptu = vert_icon.find_element(
-                By.XPATH,
-                "./ancestor::div[contains(@class,'q-tree__node')]//div[contains(@class,'header-publication') and contains(text(),'IPTU CTM GEO')]",
-            )
-            # Rola até ele e clica via JS
-            self.driver.execute_script(
-                "arguments[0].scrollIntoView(true);", elemento_iptu
-            )
-            time.sleep(0.3)
-            self.driver.execute_script("arguments[0].click();", elemento_iptu)
-            logger.info("Elemento 'IPTU CTM GEO' clicado")
-            time.sleep(5)
+            # Lote CP - ATIVO
+            lote_cp_item = ativar_item("Lote CP - ATIVO")
 
-            # 2. Marca o lote filtrado
-            checkbox_lote = self.wait.until(
-                EC.element_to_be_clickable(
-                    (By.XPATH, "//div[@class='q-checkbox__bg absolute']")
-                )
-            )
-            self._click(checkbox_lote)
-            logger.info("Lote filtrado marcado")
-            time.sleep(0.5)
+            try:
+                # Captura todas as linhas da tabela
+                tabela = lote_cp_item.find_element(By.TAG_NAME, "table")
+                linhas = tabela.find_elements(By.TAG_NAME, "tr")
 
-            # 3. Coleta todas as chaves e valores da tabela
-            tabela_lote = self.wait.until(
-                EC.presence_of_element_located((By.XPATH, "//tbody"))
-            )
+                # Pega a sexta linha (índice 5, porque lista em Python é 0-based)
+                linha_area = linhas[5]
+                colunas = linha_area.find_elements(By.TAG_NAME, "td")
+                valor = colunas[1].text.strip()  # segunda coluna
+                resultado["lote_cp_ativo_area_informada"] = valor
+                logging.info(f"Valor capturado Lote CP - ATIVO: {valor}")
+            except Exception as e:
+                logging.warning(f"Não foi possível capturar área Lote CP - ATIVO: {e}")
+                resultado["lote_cp_ativo_area_informada"] = None
 
-            linhas = tabela_lote.find_elements(By.XPATH, ".//tr")
-            info_dict = {}
+            # Imprime chave e valor
+            for chave, valor in resultado.items():
+                print(f"{chave}: {valor}")
 
-            for linha in linhas:
-                try:
-                    chave_elem = linha.find_element(By.XPATH, ".//td[1]")
-                    valor_elem = linha.find_element(By.XPATH, ".//td[2]")
-                    chave = chave_elem.text.strip()
-                    valor = valor_elem.text.strip()
-                    if chave:  # Ignora linhas sem chave
-                        info_dict[chave] = valor
-                except Exception as e:
-                    logger.warning("Erro ao processar linha da tabela: %s", e)
-                    continue
+            return resultado
 
-            # Print para verificar os dados coletados
-            print(info_dict)
-
-            logger.info("Informações coletadas com sucesso: %s", info_dict)
-            return info_dict
-
-        except Exception as e:
-            logger.error("Erro ao coletar informações no Sisctm PBH: %s", e)
+        except NoSuchElementException as e:
+            logging.error(f"Elemento não encontrado: {e}")
             return {}
+        except ElementClickInterceptedException as e:
+            logging.error(f"Não foi possível clicar no item: {e}")
+            return {}
+        except Exception as e:
+            logging.error(f"Erro inesperado ao capturar áreas: {e}")
+            return {}
+
+    # MÉTODO COMENTADO PARA FUTURAMENTE USAR
+    # ACESSA AS INFORMAÇÕES DO LOTE FILTRADO CLICANDO EM CTM GEO E CAPTURA TODA A TABELA
+
+    # def informacoes_sisctm(self) -> dict:
+    #     """Coleta informações do lote filtrado no Sisctm PBH."""
+    #     try:
+    #         logger.info("Iniciando coleta de informações do Sisctm")
+
+    #         # Localiza o container da camada Tributário
+    #         camada_tributario_container = self.wait.until(
+    #             EC.presence_of_element_located(
+    #                 (
+    #                     By.XPATH,
+    #                     "//div[text()='Tributário']/ancestor::div[contains(@class,'q-tree__node')]",
+    #                 )
+    #             )
+    #         )
+
+    #         # Busca todos os ícones more_vert dentro dessa camada
+    #         more_vert_icons = camada_tributario_container.find_elements(
+    #             By.XPATH,
+    #             ".//i[@class='q-icon notranslate material-icons' and text()='more_vert']",
+    #         )
+
+    #         # Verifica se existe o quarto ícone (IPTU CTM GEO)
+    #         if len(more_vert_icons) >= 4:
+    #             vert_icon = more_vert_icons[3]
+    #         else:
+    #             logger.error(
+    #                 "Não foi encontrado o quarto ícone more_vert dentro da camada Tributário"
+    #             )
+    #             return {}
+
+    #         # 1. Localiza o elemento 'IPTU CTM GEO' relativo ao ícone
+    #         elemento_iptu = vert_icon.find_element(
+    #             By.XPATH,
+    #             "./ancestor::div[contains(@class,'q-tree__node')]//div[contains(@class,'header-publication') and contains(text(),'IPTU CTM GEO')]",
+    #         )
+    #         # Rola até ele e clica via JS
+    #         self.driver.execute_script(
+    #             "arguments[0].scrollIntoView(true);", elemento_iptu
+    #         )
+    #         time.sleep(0.3)
+    #         self.driver.execute_script("arguments[0].click();", elemento_iptu)
+    #         logger.info("Elemento 'IPTU CTM GEO' clicado")
+    #         time.sleep(5)
+
+    #         # 2. Marca o lote filtrado
+    #         checkbox_lote = self.wait.until(
+    #             EC.element_to_be_clickable(
+    #                 (By.XPATH, "//div[@class='q-checkbox__bg absolute']")
+    #             )
+    #         )
+    #         self._click(checkbox_lote)
+    #         logger.info("Lote filtrado marcado")
+    #         time.sleep(0.5)
+
+    #         # 3. Coleta todas as chaves e valores da tabela
+    #         tabela_lote = self.wait.until(
+    #             EC.presence_of_element_located((By.XPATH, "//tbody"))
+    #         )
+
+    #         linhas = tabela_lote.find_elements(By.XPATH, ".//tr")
+    #         info_dict = {}
+
+    #         for linha in linhas:
+    #             try:
+    #                 chave_elem = linha.find_element(By.XPATH, ".//td[1]")
+    #                 valor_elem = linha.find_element(By.XPATH, ".//td[2]")
+    #                 chave = chave_elem.text.strip()
+    #                 valor = valor_elem.text.strip()
+    #                 if chave:  # Ignora linhas sem chave
+    #                     info_dict[chave] = valor
+    #             except Exception as e:
+    #                 logger.warning("Erro ao processar linha da tabela: %s", e)
+    #                 continue
+
+    #         # Print para verificar os dados coletados
+    #         print(info_dict)
+
+    #         logger.info("Informações coletadas com sucesso: %s", info_dict)
+    #         return info_dict
+
+    #     except Exception as e:
+    #         logger.error("Erro ao coletar informações no Sisctm PBH: %s", e)
+    #         return {}

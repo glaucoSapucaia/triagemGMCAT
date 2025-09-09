@@ -240,12 +240,31 @@ def gerar_relatorio(
         if anexos_sisctm:
             adicionar_anexos(anexos_sisctm)
 
-        # Constrói a tabela a partir do dicionário
-        data = [["Chave", "Valor"]]
-        for chave, valor in dados_sisctm.items():
-            data.append([chave, valor])
+        # Mapeamento de nomes legíveis
+        nomes_legiveis = {
+            "iptu_ctm_geo_area_do_terreno": "Área (IPTU CTM GEO)",
+            "lote_cp_ativo_area_informada": "Área Informada (Lote CP - Ativo)",
+        }
 
-        tabela = Table(data, colWidths=[150, 350])
+        # Seleciona apenas as áreas coletadas
+        chaves_areas = ["iptu_ctm_geo_area_do_terreno", "lote_cp_ativo_area_informada"]
+        data = [["Chave", "Valor"]]
+
+        for chave in chaves_areas:
+            valor = dados_sisctm.get(chave, "Não encontrado")
+
+            # Adiciona "m²" ao valor do Lote CP Ativo se não estiver presente
+            if (
+                chave == "lote_cp_ativo_area_informada"
+                and valor not in ["Não encontrado", ""]
+                and "m" not in valor
+            ):
+                valor = f"{valor} m2"
+
+            data.append([nomes_legiveis.get(chave, chave), valor])
+
+        # Cria a tabela
+        tabela = Table(data, colWidths=[200, 300])
         tabela.setStyle(
             TableStyle(
                 [

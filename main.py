@@ -75,48 +75,48 @@ def main():
                 logging.info(f"Iniciando coleta para índice: {indice}")
 
                 # Sistema 1: Siatu (PB e Anexos)
-                driver_siatu = criar_driver(
-                    pasta_indice,
-                    caminho_perfil=r"C:\Users\glauc\AppData\Local\Google\Chrome\SeleniumProfile",
-                    nome_perfil="Default",
-                )
-                try:
-                    siatu = SiatuAuto(
-                        driver=driver_siatu,
-                        url="https://siatu-producao.pbh.gov.br/seguranca/login?service=https%3A%2F%2Fsiatu-producao.pbh.gov.br%2Faction%2Fmenu",
-                        usuario=credenciais["usuario"],
-                        senha=credenciais["senha"],
-                        pasta_download=pasta_indice,
-                    )
+                # driver_siatu = criar_driver(
+                #     pasta_indice,
+                #     caminho_perfil=r"C:\Users\glauc\AppData\Local\Google\Chrome\SeleniumProfile",
+                #     nome_perfil="Default",
+                # )
+                # try:
+                #     siatu = SiatuAuto(
+                #         driver=driver_siatu,
+                #         url="https://siatu-producao.pbh.gov.br/seguranca/login?service=https%3A%2F%2Fsiatu-producao.pbh.gov.br%2Faction%2Fmenu",
+                #         usuario=credenciais["usuario"],
+                #         senha=credenciais["senha"],
+                #         pasta_download=pasta_indice,
+                #     )
 
-                    anexos_count = 0
+                #     anexos_count = 0
 
-                    if siatu.acessar() and siatu.login() and siatu.navegar():
-                        dados_PB = siatu.planta_basica(indice)
-                        anexos_count = siatu.download_anexos(indice)
+                #     if siatu.acessar() and siatu.login() and siatu.navegar():
+                #         dados_PB = siatu.planta_basica(indice)
+                #         anexos_count = siatu.download_anexos(indice)
 
-                    logging.info(f"Sistema 1 concluído para índice {indice}")
-                finally:
-                    driver_siatu.quit()
+                #     logging.info(f"Sistema 1 concluído para índice {indice}")
+                # finally:
+                #     driver_siatu.quit()
 
                 # Sistema 2: Urbano (Projeto, Alvará e Baixa de Construção)
-                driver_urbano = criar_driver(pasta_indice)
-                try:
-                    urbano = UrbanoAuto(
-                        driver=driver_urbano,
-                        url="https://urbano.pbh.gov.br/edificacoes/#/",
-                        usuario=credenciais["usuario"],
-                        senha=credenciais["senha"],
-                        pasta_download=pasta_indice,
-                    )
+                # driver_urbano = criar_driver(pasta_indice)
+                # try:
+                #     urbano = UrbanoAuto(
+                #         driver=driver_urbano,
+                #         url="https://urbano.pbh.gov.br/edificacoes/#/",
+                #         usuario=credenciais["usuario"],
+                #         senha=credenciais["senha"],
+                #         pasta_download=pasta_indice,
+                #     )
 
-                    projetos_count = 0
-                    if urbano.acessar() and urbano.login():
-                        projetos_count, dados_projeto = urbano.download_projeto(indice)
+                #     projetos_count = 0
+                #     if urbano.acessar() and urbano.login():
+                #         projetos_count, dados_projeto = urbano.download_projeto(indice)
 
-                    logging.info(f"Sistema 2 concluído para índice {indice}")
-                finally:
-                    driver_urbano.quit()
+                #     logging.info(f"Sistema 2 concluído para índice {indice}")
+                # finally:
+                #     driver_urbano.quit()
 
                 # Sistema 3: SISCTM (Dados gerais do imóvel)
                 driver_sistcm = criar_driver(pasta_indice)
@@ -129,8 +129,9 @@ def main():
                         pasta_download=pasta_indice,
                     )
 
-                    if sisctm.login() and sisctm.navegar(indice):
-                        dados_sisctm = sisctm.informacoes_sisctm()
+                    if sisctm.login() and sisctm.ativar_camadas(indice):
+                        dados_sisctm = sisctm.capturar_areas()
+                        pass
 
                     logging.info(f"Sistema 3 concluído para índice {'indice'}")
                 finally:
@@ -142,13 +143,13 @@ def main():
                 )
                 gerar_relatorio(
                     indice_cadastral=indice,
-                    anexos_count=anexos_count,
-                    projetos_count=projetos_count,
+                    # anexos_count=anexos_count,
+                    # projetos_count=projetos_count,
                     pasta_anexos=pasta_indice,
                     prps_trabalhador=credenciais["usuario"],
                     nome_pdf=pdf_path,
-                    dados_planta=dados_PB,
-                    dados_projeto=dados_projeto,
+                    # dados_planta=dados_PB,
+                    # dados_projeto=dados_projeto,
                     dados_sisctm=dados_sisctm,
                 )
                 logging.info(f"Relatório gerado: {pdf_path}")
