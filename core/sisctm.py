@@ -340,6 +340,7 @@ class SisctmAuto:
 
     def _prints_aereo(self) -> None:
         # Print AEREO CTM
+        time.sleep(15)
         screenshot_path = os.path.join(self.pasta_download, "CTM_Aereo.png")
         self.driver.save_screenshot(screenshot_path)
         logger.info("Print da tela salvo em: %s", screenshot_path)
@@ -415,27 +416,30 @@ class SisctmAuto:
 
             # Função auxiliar para ativar item
             def ativar_item(nome_item):
-                item = painel.find_element(
-                    By.XPATH,
-                    f".//div[contains(@class,'q-item') and .//div[contains(text(),'{nome_item}')]]",
-                )
-                botao = item.find_element(By.XPATH, ".//div[@role='button']")
-                aria = botao.get_attribute("aria-expanded")
-                if aria != "true":
-                    logging.info(f"{nome_item} não está ativo. Ativando...")
-                    botao.click()
-                    WebDriverWait(botao, 5).until(
-                        lambda x: x.get_attribute("aria-expanded") == "true"
+                try:
+                    item = painel.find_element(
+                        By.XPATH,
+                        f".//div[contains(@class,'q-item') and .//div[contains(text(),'{nome_item}')]]",
                     )
-                    logging.info(f"{nome_item} ativado")
-                    time.sleep(3)
-                else:
-                    logging.info(f"{nome_item} já está ativo")
-                return item
+                    botao = item.find_element(By.XPATH, ".//div[@role='button']")
+                    aria = botao.get_attribute("aria-expanded")
+                    if aria != "true":
+                        logging.info(f"{nome_item} não está ativo. Ativando...")
+                        botao.click()
+                        WebDriverWait(botao, 5).until(
+                            lambda x: x.get_attribute("aria-expanded") == "true"
+                        )
+                        logging.info(f"{nome_item} ativado")
+                        time.sleep(3)
+                    else:
+                        logging.info(f"{nome_item} já está ativo")
+                    return item
+                except Exception as e:
+                    logging.info(f"Erro ao ativar item {nome_item}: {e}")
 
             # --- IPTU CTM GEO ---
             iptu_item = ativar_item("IPTU CTM GEO")
-
+            time.sleep(2)
             # Aguarda a linha com "ÁREA" existir
             try:
                 linha_area = WebDriverWait(iptu_item, 5).until(
@@ -450,6 +454,44 @@ class SisctmAuto:
             except TimeoutException:
                 logging.warning("Não foi possível capturar área IPTU CTM GEO")
                 resultado["iptu_ctm_geo_area_do_terreno"] = None
+
+            # Captura campos do endereço
+            try:
+                campos = {
+                    "tipo_logradouro": ".//table//tr[24]/td[2]",
+                    "nome_logradouro": ".//table//tr[25]/td[2]",
+                    "numero_imovel": ".//table//tr[26]/td[2]",
+                    "complemento": ".//table//tr[27]/td[2]",
+                    "cep": ".//table//tr[28]/td[2]",
+                }
+
+                valores = {}
+                for chave, xpath in campos.items():
+                    try:
+                        elemento = WebDriverWait(iptu_item, 5).until(
+                            EC.presence_of_element_located((By.XPATH, xpath))
+                        )
+                        valores[chave] = elemento.text.strip()
+                    except TimeoutException:
+                        valores[chave] = ""
+
+                # Remove pontos do número do imóvel
+                valores["numero_imovel"] = valores["numero_imovel"].replace(".", "")
+
+                # Monta o endereço no formato desejado (padrão Google, sem formatar CEP)
+                endereco = f"{valores['tipo_logradouro']} {valores['nome_logradouro']}, {valores['numero_imovel']}"
+                if valores["complemento"]:  # só adiciona se não estiver vazio
+                    endereco += f" {valores['complemento']}"
+                endereco += f" - Belo Horizonte - MG, {valores['cep']}"
+
+                resultado["endereco_ctmgeo"] = endereco
+                logging.info(
+                    f"Endereço CTM GEO capturado: {resultado['endereco_ctmgeo']}"
+                )
+
+            except Exception as e:
+                logging.warning(f"Não foi possível capturar endereço CTM GEO: {e}")
+                resultado["endereco_ctmgeo"] = None
 
             # Lote CP - ATIVO
             lote_cp_item = ativar_item("Lote CP - ATIVO")
@@ -469,9 +511,9 @@ class SisctmAuto:
                 logging.warning(f"Não foi possível capturar área Lote CP - ATIVO: {e}")
                 resultado["lote_cp_ativo_area_informada"] = None
 
-            # Imprime chave e valor
-            for chave, valor in resultado.items():
-                print(f"{chave}: {valor}")
+            # Imprime chave e valor (DEBUG)
+            # for chave, valor in resultado.items():
+            #     print(f"{chave}: {valor}")
 
             return resultado
 

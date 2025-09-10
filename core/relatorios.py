@@ -46,6 +46,105 @@ def gerar_relatorio(
     )
     elementos = []
 
+    styles = getSampleStyleSheet()
+    style_normal = styles["Normal"]
+    style_normal.fontSize = 10
+
+    def gerar_tabela_secao(
+        titulo_secao, dados_dict=None, chaves=None, nomes_legiveis=None, anexos=None
+    ):
+        """
+        Cria uma tabela de chave/valor para uma seção do relatório.
+        """
+        data = [["Chave", "Valor"]]
+
+        # Definir quais chaves devem ser tratadas como área
+        chaves_area = [
+            "lote_cp_ativo_area_informada",
+            "iptu_ctm_geo_area_do_terreno",
+            "area_construida",
+            "area_lotes",
+        ]
+
+        if dados_dict and chaves:
+            for chave in chaves:
+                valor = dados_dict.get(chave)
+
+                # Garante que None ou string vazia vire "Não informado"
+                if valor is None or valor == "":
+                    valor = "Não informado"
+
+                # Padroniza unidades de área
+                if chave in chaves_area and valor not in ["Não informado", ""]:
+                    valor = re.sub(
+                        r"\s*m2\s*|\s*m²\s*", "", str(valor), flags=re.IGNORECASE
+                    )
+                    valor = f"{valor} m²"
+
+                # Cria Paragraph para permitir quebra de linha
+                valor_paragraph = Paragraph(str(valor), style_normal)
+                data.append(
+                    [
+                        nomes_legiveis.get(chave, chave) if nomes_legiveis else chave,
+                        valor_paragraph,
+                    ]
+                )
+
+        # Adiciona anexos se houver
+        if anexos:
+            for i, anexo in enumerate(anexos, start=1):
+                # Normaliza o nome do arquivo para o link
+                href = "./" + quote(
+                    anexo,
+                    safe="._-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
+                )
+                link = Paragraph(
+                    f'<a href="{href}" color="blue">{anexo}</a>', style_normal
+                )
+                data.append([f"Anexo {i}", link])
+
+        tabela = Table(data, colWidths=[200, 300])
+        tabela.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.lightblue),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 10),
+                    ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                ]
+            )
+        )
+
+        adicionar_secao(titulo_secao)
+        elementos.append(tabela)
+        elementos.append(Spacer(1, 12))
+
+    def extrair_elementos_para_comparacao(endereco: str):
+        """
+        Extrai rua, número e CEP de um endereço, para fins de comparação.
+        Normaliza CEP removendo hífen e pega o primeiro número após a rua.
+        """
+        if not endereco or endereco.lower() in ["não informado", ""]:
+            return None, None, None
+
+        # Extrai CEP (último grupo de 8 dígitos ou 5+3 dígitos)
+        cep_match = re.search(r"(\d{5}-?\d{3}|\d{8})", endereco.replace(" ", ""))
+        cep = cep_match.group(1) if cep_match else None
+        if cep:
+            cep = cep.replace("-", "")  # normaliza removendo hífen
+
+        # Extrai número do imóvel: primeiro número após vírgula
+        numero_match = re.search(r",\s*(\d+)", endereco)
+        numero = numero_match.group(1) if numero_match else None
+
+        # Rua = tudo antes da primeira vírgula
+        rua = endereco.split(",")[0].strip() if "," in endereco else endereco.strip()
+
+        return rua.lower(), numero, cep
+
     # Estilos
     estilos = getSampleStyleSheet()
     estilo_titulo = ParagraphStyle(
@@ -119,7 +218,13 @@ def gerar_relatorio(
             elementos.append(Spacer(1, 5))
 
     # Prepara anexos (com renomeação no disco para nomes seguros)
-    anexos_planta, anexos_siatu, anexos_projetos, anexos_sisctm = [], [], [], []
+    anexos_planta, anexos_siatu, anexos_projetos, anexos_sisctm, anexos_google = (
+        [],
+        [],
+        [],
+        [],
+        [],
+    )
 
     if pasta_anexos and os.path.exists(pasta_anexos):
         for arq in sorted(os.listdir(pasta_anexos)):
@@ -149,6 +254,7 @@ def gerar_relatorio(
                 anexos_planta.append(arq)
             elif (
                 "sem_projeto" in arq.lower()
+                or "sem_alvara-baixa" in arq.lower()
                 or "certidao_baixa" in arq.lower()
                 or "alvara_construcao" in arq.lower()
                 or "projeto" in arq.lower()
@@ -156,6 +262,8 @@ def gerar_relatorio(
                 anexos_projetos.append(arq)
             elif "CTM" in arq:
                 anexos_sisctm.append(arq)
+            elif "google" in arq:
+                anexos_google.append(arq)
             else:
                 anexos_siatu.append(arq)
 
@@ -163,123 +271,162 @@ def gerar_relatorio(
     # COL
     adicionar_secao(
         "1. Certidão de Origem de Lote",
-        "Verifique se a COL está na lista de anexos Siatu. "
+        "Verifique se a COL está na lista de Anexos SIATU. "
         "<br/>Caso não a encontre, busque manualmente a certidão de origem de lote (COL). "
         "<br/><b>Informação obtida no portal:</b> "
         '<a href="https://siurbe.pbh.gov.br/#/solicitacao/CertidaoOrigemLote">'
         '<font color="blue"><u>https://siurbe.pbh.gov.br/#/solicitacao/CertidaoOrigemLote</u></font></a>',
     )
 
+    # 2. Planta Básica - Exercício Seguinte e/ou Recalculado e/ou Primeiro do Ano
     if dados_planta:
-        texto_planta = f"""
-        <b>Área Construída Total:</b> {dados_planta.get('area_construida', 'Não encontrado')}<br/>
-        <b>Exercício:</b> {dados_planta.get('exercicio', 'Não encontrado')}<br/>
-        <b>Tipo de uso:</b> {dados_planta.get('tipo_uso', 'Não encontrado')}
-        """
-    else:
-        texto_planta = "Planta Básica não encontrada."
-
-    # PB
-    adicionar_secao(
-        "2. Planta Básica - Exercício Seguinte e/ou Recalculado e/ou Primeiro do Ano",
-        texto_planta,
-    )
-    adicionar_anexos(anexos_planta)
-
-    # ANEXOS SIATU
-    adicionar_secao(
-        "3. Croqui e Anexos Siatu", f"{anexos_count} anexo(s) encontrado(s)."
-    )
-    adicionar_anexos(anexos_siatu)
-
-    # PROJETO, ALVARÁ E BAIXA DE CONSTRUÇÃO
-    texto_projeto = f"{projetos_count} anexo(s) encontrado(s)."
-    if dados_projeto:
-        texto_projeto += "<br/>"
-        texto_projeto += (
-            f"<b>Tipo:</b> {dados_projeto.get('tipo', 'Não informado')}<br/>"
+        chaves_pb = ["area_construida", "exercicio", "tipo_uso", "endereco_imovel"]
+        nomes_legiveis_pb = {
+            "area_construida": "Área Construída Total",
+            "exercicio": "Exercício",
+            "tipo_uso": "Tipo de uso",
+            "endereco_imovel": "Endereço do Imóvel (SIATU)",
+        }
+        gerar_tabela_secao(
+            "2. Planta Básica - Exercício Seguinte e/ou Recalculado e/ou Primeiro do Ano",
+            dados_planta,
+            chaves_pb,
+            nomes_legiveis_pb,
+            anexos_planta,
         )
-        texto_projeto += f"<b>Requerimento:</b> {dados_projeto.get('requerimento', 'Não informado')}<br/>"
-        texto_projeto += f"<b>Última Alteração:</b> {dados_projeto.get('ultima_alteracao', 'Não informado')}<br/>"
-        texto_projeto += f"<b>Área do(s) lote(s):</b> {dados_projeto.get('area_lotes', 'Não informado')}"
-    adicionar_secao("4. Projeto, Alvará e Baixa de Construção", texto_projeto)
-    adicionar_anexos(anexos_projetos)
-
-    # MATRÍCULA E CARTÓRIO
-    if dados_planta:
-        texto_matricula = f"""
-        <b>Número:</b> {dados_planta.get('matricula_registro', 'Não informado')}<br/>
-        <b>Cartório:</b> {dados_planta.get('cartorio', 'Não informado')}
-        """
     else:
-        texto_matricula = "Não informado"
-    adicionar_secao("5. Matrícula do Imóvel", texto_matricula)
+        adicionar_secao(
+            "2. Planta Básica - Exercício Seguinte e/ou Recalculado e/ou Primeiro do Ano",
+            "Planta Básica não encontrada.",
+        )
 
-    # MORADORES (BASE CEMIG)
-    adicionar_secao("6. Moradores Ocupantes", "Pesquisa realizada na base da CEMIG.")
-    moradores = ["Morador 1 exemplo", "Morador 2 exemplo"]
-    lista_moradores = ListFlowable(
-        [ListItem(Paragraph(m, estilo_texto)) for m in moradores],
-        bulletType="bullet",
-        leftIndent=20,
-    )
-    elementos.append(lista_moradores)
-    elementos.append(Spacer(1, 12))
+    # 3. Croqui e Anexos Siatu
+    # data = [["Chave", "Valor"]]
+    # data.append(["Total de Anexos", f"{anexos_count} anexo(s) encontrado(s)."])
 
-    # OBSERVAÇÕES
-    adicionar_secao("7. Observações Gerais", "Observações de exemplo.")
+    if anexos_siatu:
+        gerar_tabela_secao(
+            "3. Anexos SIATU",
+            # {"Total de Anexos": f"{anexos_count} anexo(s) encontrado(s)."},
+            # ["Total de Anexos"],
+            anexos=anexos_siatu,
+        )
+    else:
+        adicionar_secao(
+            "3. Anexos SIATU",
+            "Nenhum anexo encontrado.",
+        )
 
-    # CONCLUSÃO
-    adicionar_secao("8. Conclusão Parcial", "Conclusão de exemplo.")
-
-    # 9. SISCTM
+    # 4. SISCTM
     if dados_sisctm:
-        adicionar_secao("9. Dados SISCTM")
-
-        # Adiciona os anexos SISCTM
-        if anexos_sisctm:
-            adicionar_anexos(anexos_sisctm)
-
-        # Mapeamento de nomes legíveis
         nomes_legiveis = {
             "iptu_ctm_geo_area_do_terreno": "Área (IPTU CTM GEO)",
             "lote_cp_ativo_area_informada": "Área Informada (Lote CP - Ativo)",
+            "endereco_ctmgeo": "Endereço (CTM GEO)",
         }
-
-        # Seleciona apenas as áreas coletadas
-        chaves_areas = ["iptu_ctm_geo_area_do_terreno", "lote_cp_ativo_area_informada"]
-        data = [["Chave", "Valor"]]
-
-        for chave in chaves_areas:
-            valor = dados_sisctm.get(chave, "Não encontrado")
-
-            # Adiciona "m²" ao valor do Lote CP Ativo se não estiver presente
-            if (
-                chave == "lote_cp_ativo_area_informada"
-                and valor not in ["Não encontrado", ""]
-                and "m" not in valor
-            ):
-                valor = f"{valor} m2"
-
-            data.append([nomes_legiveis.get(chave, chave), valor])
-
-        # Cria a tabela
-        tabela = Table(data, colWidths=[200, 300])
-        tabela.setStyle(
-            TableStyle(
-                [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.lightblue),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 10),
-                    ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
-                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-                ]
-            )
+        chaves = [
+            "iptu_ctm_geo_area_do_terreno",
+            "lote_cp_ativo_area_informada",
+            "endereco_ctmgeo",
+        ]
+        gerar_tabela_secao(
+            "4. Dados SISCTM", dados_sisctm, chaves, nomes_legiveis, anexos_sisctm
         )
-        elementos.append(tabela)
-        elementos.append(Spacer(1, 12))
+    else:
+        adicionar_secao(
+            "4. Dados SISCTM",
+            "Nenhum dado encontrado.",
+        )
+
+    # 5. Google Maps
+    # data = [["Chave", "Valor"]]
+    # data.append(["Total de Anexos", f"{anexos_count} anexo(s) encontrado(s)."])
+
+    if anexos_google:
+        gerar_tabela_secao(
+            "5. Google Maps",
+            # {"Total de Anexos": f"{anexos_count} anexo(s) encontrado(s)."},
+            # ["Total de Anexos"],
+            anexos=anexos_google,
+        )
+    else:
+        adicionar_secao(
+            "5. Google Maps",
+            "Endereço não encontrado.",
+        )
+
+    # 6. Projeto, Alvará e Baixa de Construção
+    if dados_projeto:
+        chaves_projeto = ["tipo", "requerimento", "ultima_alteracao", "area_lotes"]
+        nomes_legiveis_projeto = {
+            "tipo": "Tipo",
+            "requerimento": "Requerimento",
+            "ultima_alteracao": "Última Alteração",
+            "area_lotes": "Área do(s) lote(s)",
+        }
+        dados_projeto_temp = dados_projeto if dados_projeto else {}
+        gerar_tabela_secao(
+            "6. Projeto, Alvará e Baixa de Construção",
+            dados_projeto_temp,
+            chaves_projeto,
+            nomes_legiveis_projeto,
+            anexos_projetos,
+        )
+    else:
+        adicionar_secao(
+            "6. Projeto, Alvará e Baixa de Construção",
+            "Nenhum dado encontrado.",
+        )
+
+    # 7. Matrícula do Imóvel
+    if dados_planta:
+        nomes_legiveis = {
+            "matricula_registro": "Número da Matrícula",
+            "cartorio": "Cartório",
+        }
+        chaves = ["matricula_registro", "cartorio"]
+        gerar_tabela_secao(
+            "7. Matrícula do Imóvel", dados_planta, chaves, nomes_legiveis
+        )
+    else:
+        adicionar_secao("7. Matrícula do Imóvel", "Nenhum dado encontrado.")
+
+        # MORADORES (BASE CEMIG)
+        # adicionar_secao(
+        #     "6. Moradores Ocupantes", "Pesquisa realizada na base da CEMIG."
+        # )
+        # moradores = ["Morador 1 exemplo", "Morador 2 exemplo"]
+        # lista_moradores = ListFlowable(
+        #     [ListItem(Paragraph(m, estilo_texto)) for m in moradores],
+        #     bulletType="bullet",
+        #     leftIndent=20,
+        # )
+        # elementos.append(lista_moradores)
+        # elementos.append(Spacer(1, 12))
+
+    # OBSERVAÇÕES
+    # adicionar_secao("7. Observações Gerais", "Observações de exemplo.")
+
+    # 8. CONCLUSÃO
+    if dados_planta and dados_sisctm:
+        endereco_siatu = dados_planta.get("endereco_imovel", "")
+        endereco_ctm = dados_sisctm.get("endereco_ctmgeo", "")
+
+        rua_s, numero_s, cep_s = extrair_elementos_para_comparacao(endereco_siatu)
+        rua_c, numero_c, cep_c = extrair_elementos_para_comparacao(endereco_ctm)
+
+        if (rua_s, numero_s, cep_s) == (rua_c, numero_c, cep_c):
+            texto_conclusao = "Endereço SIATU e CTM GEO são iguais."
+        else:
+            texto_conclusao = "Endereço SIATU e CTM GEO são diferentes."
+
+        # Adiciona na seção de conclusão
+        adicionar_secao("8. Conclusão Parcial", texto_conclusao)
+    else:
+        adicionar_secao(
+            "8. Conclusão Parcial",
+            "Não há dados para analise.",
+        )
 
     # Gera o PDF
     doc.build(elementos)

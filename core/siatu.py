@@ -290,6 +290,20 @@ class SiatuAuto:
         except Exception:
             dados["tipo_uso"] = "Não informado"
 
+        # ENDEREÇO DO IMÓVEL
+        try:
+            endereco_elem = self.driver.find_element(
+                By.XPATH,
+                "//table[contains(@class,'table_item')][.//td[text()='Endereço do Imóvel']]//tr[2]/td[@class='valor_campo']",
+            )
+            valor = endereco_elem.text.strip()
+            dados["endereco_imovel"] = valor if valor else "Não informado"
+        except Exception:
+            dados["endereco_imovel"] = "Não informado"
+
+        # DEBUG
+        # print(dados["endereco_imovel"])
+
         # CAPTURA TODOS OS VALORES DE ÁREA CONSTRUÍDA
         try:
             area_elems = self.driver.find_elements(

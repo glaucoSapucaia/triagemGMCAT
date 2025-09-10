@@ -6,7 +6,7 @@ from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from interface import iniciar_interface
-from core import SiatuAuto, UrbanoAuto, SisctmAuto, gerar_relatorio
+from core import SiatuAuto, UrbanoAuto, SisctmAuto, GoogleMapsAuto, gerar_relatorio
 import locale
 
 # Define a localidade para português do Brasil
@@ -75,48 +75,48 @@ def main():
                 logging.info(f"Iniciando coleta para índice: {indice}")
 
                 # Sistema 1: Siatu (PB e Anexos)
-                # driver_siatu = criar_driver(
-                #     pasta_indice,
-                #     caminho_perfil=r"C:\Users\glauc\AppData\Local\Google\Chrome\SeleniumProfile",
-                #     nome_perfil="Default",
-                # )
-                # try:
-                #     siatu = SiatuAuto(
-                #         driver=driver_siatu,
-                #         url="https://siatu-producao.pbh.gov.br/seguranca/login?service=https%3A%2F%2Fsiatu-producao.pbh.gov.br%2Faction%2Fmenu",
-                #         usuario=credenciais["usuario"],
-                #         senha=credenciais["senha"],
-                #         pasta_download=pasta_indice,
-                #     )
+                driver_siatu = criar_driver(
+                    pasta_indice,
+                    caminho_perfil=r"C:\Users\glauc\AppData\Local\Google\Chrome\SeleniumProfile",
+                    nome_perfil="Default",
+                )
+                try:
+                    siatu = SiatuAuto(
+                        driver=driver_siatu,
+                        url="https://siatu-producao.pbh.gov.br/seguranca/login?service=https%3A%2F%2Fsiatu-producao.pbh.gov.br%2Faction%2Fmenu",
+                        usuario=credenciais["usuario"],
+                        senha=credenciais["senha"],
+                        pasta_download=pasta_indice,
+                    )
 
-                #     anexos_count = 0
+                    anexos_count = 0
 
-                #     if siatu.acessar() and siatu.login() and siatu.navegar():
-                #         dados_PB = siatu.planta_basica(indice)
-                #         anexos_count = siatu.download_anexos(indice)
+                    if siatu.acessar() and siatu.login() and siatu.navegar():
+                        dados_PB = siatu.planta_basica(indice)
+                        anexos_count = siatu.download_anexos(indice)
 
-                #     logging.info(f"Sistema 1 concluído para índice {indice}")
-                # finally:
-                #     driver_siatu.quit()
+                    logging.info(f"Sistema 1 concluído para índice {indice}")
+                finally:
+                    driver_siatu.quit()
 
                 # Sistema 2: Urbano (Projeto, Alvará e Baixa de Construção)
-                # driver_urbano = criar_driver(pasta_indice)
-                # try:
-                #     urbano = UrbanoAuto(
-                #         driver=driver_urbano,
-                #         url="https://urbano.pbh.gov.br/edificacoes/#/",
-                #         usuario=credenciais["usuario"],
-                #         senha=credenciais["senha"],
-                #         pasta_download=pasta_indice,
-                #     )
+                driver_urbano = criar_driver(pasta_indice)
+                try:
+                    urbano = UrbanoAuto(
+                        driver=driver_urbano,
+                        url="https://urbano.pbh.gov.br/edificacoes/#/",
+                        usuario=credenciais["usuario"],
+                        senha=credenciais["senha"],
+                        pasta_download=pasta_indice,
+                    )
 
-                #     projetos_count = 0
-                #     if urbano.acessar() and urbano.login():
-                #         projetos_count, dados_projeto = urbano.download_projeto(indice)
+                    projetos_count = 0
+                    if urbano.acessar() and urbano.login():
+                        projetos_count, dados_projeto = urbano.download_projeto(indice)
 
-                #     logging.info(f"Sistema 2 concluído para índice {indice}")
-                # finally:
-                #     driver_urbano.quit()
+                    logging.info(f"Sistema 2 concluído para índice {indice}")
+                finally:
+                    driver_urbano.quit()
 
                 # Sistema 3: SISCTM (Dados gerais do imóvel)
                 driver_sistcm = criar_driver(pasta_indice)
@@ -137,19 +137,36 @@ def main():
                 finally:
                     driver_sistcm.quit()
 
+                # Sistema 4: GOOGLE MAPS (Print Aereo e Fachada)
+                driver_google = criar_driver(pasta_indice)
+                try:
+                    google = GoogleMapsAuto(
+                        driver=driver_google,
+                        url="https://www.google.com/maps/",
+                        endereco=dados_sisctm["endereco_ctmgeo"],
+                        pasta_download=pasta_indice,
+                    )
+
+                    if google.acessar_google_maps():
+                        google.navegar()
+
+                    logging.info(f"Sistema 4 concluído para índice {'indice'}")
+                finally:
+                    driver_google.quit()
+
                 # Gera o relatório PDF
                 pdf_path = os.path.join(
                     pasta_indice, f"Relatório de Triagem - {indice}.pdf"
                 )
                 gerar_relatorio(
                     indice_cadastral=indice,
-                    # anexos_count=anexos_count,
-                    # projetos_count=projetos_count,
+                    anexos_count=anexos_count,
+                    projetos_count=projetos_count,
                     pasta_anexos=pasta_indice,
                     prps_trabalhador=credenciais["usuario"],
                     nome_pdf=pdf_path,
-                    # dados_planta=dados_PB,
-                    # dados_projeto=dados_projeto,
+                    dados_planta=dados_PB,
+                    dados_projeto=dados_projeto,
                     dados_sisctm=dados_sisctm,
                 )
                 logging.info(f"Relatório gerado: {pdf_path}")
