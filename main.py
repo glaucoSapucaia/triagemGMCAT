@@ -139,11 +139,18 @@ def main():
 
                 # Sistema 4: GOOGLE MAPS (Print Aereo e Fachada)
                 driver_google = criar_driver(pasta_indice)
+                if dados_sisctm.get("endereco_ctmgeo"):
+                    endereco_google = dados_sisctm["endereco_ctmgeo"]
+                elif dados_PB.get("endereco_imovel"):
+                    endereco_google = dados_PB["endereco_imovel"]
+                else:
+                    endereco_google = "Não encontrado"
+
                 try:
                     google = GoogleMapsAuto(
                         driver=driver_google,
                         url="https://www.google.com/maps/",
-                        endereco=dados_sisctm["endereco_ctmgeo"],
+                        endereco=endereco_google,
                         pasta_download=pasta_indice,
                     )
 
@@ -156,7 +163,7 @@ def main():
 
                 # Gera o relatório PDF
                 pdf_path = os.path.join(
-                    pasta_indice, f"Relatório de Triagem - {indice}.pdf"
+                    pasta_indice, f"1. Relatório de Triagem - {indice}.pdf"
                 )
                 gerar_relatorio(
                     indice_cadastral=indice,

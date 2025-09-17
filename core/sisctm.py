@@ -326,11 +326,11 @@ class SisctmAuto:
             time.sleep(5)
             logger.info("Janela do filtro fechada")
 
-            # PRINTS
-            self._prints_aereo()
-
             # Clique no lote canvas (mapa)
             self._clique_centro_mapa()
+
+            # PRINTS
+            self._prints_aereo()
 
             return True
 
@@ -356,7 +356,7 @@ class SisctmAuto:
         )
         self._click(elemento_bhmap)
         logger.info("Elemento 'BHMap' clicado")
-        time.sleep(1)
+        time.sleep(2)
 
         # Seleciona a ortofoto 2025 (ou 2015 no seu exemplo)
         elemento_ortofoto = self.wait.until(
@@ -369,7 +369,7 @@ class SisctmAuto:
         )
         self._click(elemento_ortofoto)
         logger.info("Ortofoto selecionada")
-        time.sleep(5)
+        time.sleep(10)
 
         # Print AEREO ORTO
         screenshot_path_orto = os.path.join(self.pasta_download, "CTM_Orto.png")

@@ -14,7 +14,7 @@ class GoogleMapsAuto:
     def __init__(self, driver, url: str, endereco, pasta_download, timeout: int = 10):
         """
         :param driver: instância do Selenium WebDriver
-        :param url: URL do Google Earth
+        :param url: URL do Google Maps
         :param timeout: tempo de espera padrão para WebDriverWait
         """
         self.driver = driver
@@ -49,6 +49,11 @@ class GoogleMapsAuto:
                 EC.presence_of_element_located((By.ID, "searchboxinput"))
             )
             search_input.clear()
+            if self.endereco == "Não encontrado":
+                logging.warning(
+                    "Endereço não encontrado, pulando navegação google maps."
+                )
+                return
             search_input.send_keys(self.endereco)
             logging.info(f"Endereço digitado: {self.endereco}")
         except Exception as e:

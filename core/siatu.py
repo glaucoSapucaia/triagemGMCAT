@@ -201,26 +201,31 @@ class SiatuAuto:
             time.sleep(2)  # tempo para a página carregar
             logger.info("Link 'Anexos' clicado")
 
-            # Verifica se há arquivos para download
-            anexos = self.driver.find_elements(
-                By.XPATH, "//table//tr/td[1]/a[contains(@onclick, 'exibeDocumento')]"
-            )
             qtd_anexos = 0
+            i = 0
 
-            for i, anexo in enumerate(anexos, start=1):
-                # Reconsulta os elementos para evitar StaleElementReferenceException
-                anexos_atualizados = self.driver.find_elements(
+            while True:
+                # Reconsulta os anexos a cada iteração para evitar StaleElementReferenceException
+                anexos = self.driver.find_elements(
                     By.XPATH,
                     "//table//tr/td[1]/a[contains(@onclick, 'exibeDocumento')]",
                 )
-                anexo_atual = anexos_atualizados[i - 1]
 
+                if i >= len(anexos):
+                    break
+
+                anexo_atual = anexos[i]
                 nome_arquivo = anexo_atual.text.strip()
 
-                # Baixa apenas arquivos PDF
+                # Se não for PDF, interrompe (abaixo não haverá PDFs)
                 if not nome_arquivo.lower().endswith(".pdf"):
-                    logger.info("Anexo %d ignorado (não é PDF): %s", i, nome_arquivo)
-                    continue
+                    logger.info(
+                        "Fim da lista de PDFs (anexo %d não é PDF: %s)",
+                        i + 1,
+                        nome_arquivo,
+                    )
+                    break
+
                 qtd_anexos += 1
 
                 # Guardar a janela principal antes do clique
@@ -228,7 +233,7 @@ class SiatuAuto:
 
                 arquivo_caminho = os.path.join(self.pasta_download, nome_arquivo)
                 self._click(anexo_atual)
-                logger.info("Anexo %d clicado: %s", i, nome_arquivo)
+                logger.info("Anexo %d clicado: %s", i + 1, nome_arquivo)
 
                 # Espera o download concluir
                 if self._esperar_download_concluir(arquivo_caminho, timeout=120):
@@ -238,17 +243,21 @@ class SiatuAuto:
                         "Download NÃO concluído no tempo limite: %s", nome_arquivo
                     )
 
-                # Fechar qualquer janela nova que tenha sido aberta
+                # Fecha janelas extras que possam ter sido abertas
                 janelas_atuais = self.driver.window_handles
                 for janela in janelas_atuais:
                     if janela != janela_principal:
                         self.driver.switch_to.window(janela)
                         self.driver.close()
 
-                # Voltar para a janela principal
+                # Volta para a janela principal
                 self.driver.switch_to.window(janela_principal)
-            else:
-                logger.info("Nenhum arquivo disponível para download")
+
+                i += 1
+
+            if qtd_anexos == 0:
+                logger.info("Nenhum PDF disponível para download")
+
             return qtd_anexos
 
         except TimeoutException as e:

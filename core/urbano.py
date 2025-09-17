@@ -91,6 +91,8 @@ class UrbanoAuto:
             # Divisão do índice
             parte1, parte2, parte3 = indice[0:3], indice[3:7], indice[7:11]
 
+            time.sleep(5)
+
             # Preenche campos
             campo1 = self.wait.until(
                 EC.presence_of_element_located((By.NAME, "zonaFiscal"))
@@ -113,7 +115,7 @@ class UrbanoAuto:
                 EC.element_to_be_clickable((By.ID, "btnPesquisar"))
             )
             self._click(btn_pesquisar)
-            time.sleep(12)  # Aguarda página carregar
+            time.sleep(15)  # Aguarda página carregar
 
             # Scroll para o print (caso necessário)
             self.driver.execute_script(
