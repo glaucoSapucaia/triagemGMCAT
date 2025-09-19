@@ -209,4 +209,10 @@ def abrir_pasta(path):
 
 
 if __name__ == "__main__":
+    inicio = datetime.now()
     main()
+    fim = datetime.now()
+    duracao = fim - inicio
+
+    minutos, segundos = divmod(duracao.total_seconds(), 60)
+    print(f"⏱ Tempo de execução: {int(minutos)} min {int(segundos)} seg")

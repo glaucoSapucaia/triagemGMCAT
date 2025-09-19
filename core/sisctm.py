@@ -447,13 +447,31 @@ class SisctmAuto:
                         (By.XPATH, ".//table//tr[td[contains(text(),'ÁREA')]]/td[2]")
                     )
                 )
-                resultado["iptu_ctm_geo_area_do_terreno"] = linha_area.text.strip()
+                resultado["iptu_ctm_geo_area"] = linha_area.text.strip()
                 logging.info(
-                    f"Valor capturado IPTU CTM GEO: {resultado['iptu_ctm_geo_area_do_terreno']}"
+                    f"Valor capturado IPTU CTM GEO: {resultado['iptu_ctm_geo_area']}"
                 )
             except TimeoutException:
                 logging.warning("Não foi possível capturar área IPTU CTM GEO")
-                resultado["iptu_ctm_geo_area_do_terreno"] = None
+                resultado["iptu_ctm_geo_area"] = None
+
+            # Aguarda a linha com "AREA_TERRENO" existir
+            try:
+                linha_area_terreno = WebDriverWait(iptu_item, 5).until(
+                    EC.presence_of_element_located(
+                        (
+                            By.XPATH,
+                            ".//table//tr[td[contains(text(),'AREA_TERRENO')]]/td[2]",
+                        )
+                    )
+                )
+                resultado["iptu_ctm_geo_area_terreno"] = linha_area_terreno.text.strip()
+                logging.info(
+                    f"Valor capturado IPTU CTM GEO AREA TERRENO: {resultado['iptu_ctm_geo_area_terreno']}"
+                )
+            except TimeoutException:
+                logging.warning("Não foi possível capturar AREA TERRENO")
+                resultado["iptu_ctm_geo_area_terreno"] = None
 
             # Captura campos do endereço
             try:

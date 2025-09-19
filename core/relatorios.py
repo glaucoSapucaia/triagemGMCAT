@@ -61,7 +61,8 @@ def gerar_relatorio(
         # Definir quais chaves devem ser tratadas como área
         chaves_area = [
             "lote_cp_ativo_area_informada",
-            "iptu_ctm_geo_area_do_terreno",
+            "iptu_ctm_geo_area",
+            "iptu_ctm_geo_area_terreno",
             "area_construida",
             "area_lotes",
         ]
@@ -80,6 +81,10 @@ def gerar_relatorio(
                         r"\s*m2\s*|\s*m²\s*", "", str(valor), flags=re.IGNORECASE
                     )
                     valor = f"{valor} m²"
+
+                # Substitui vírgula por ponto em valores numéricos
+                if valor not in ["Não informado", ""] and isinstance(valor, str):
+                    valor = valor.replace(",", ".")
 
                 # Cria Paragraph para permitir quebra de linha
                 valor_paragraph = Paragraph(str(valor), style_normal)
@@ -320,12 +325,14 @@ def gerar_relatorio(
     # 4. SISCTM
     if dados_sisctm:
         nomes_legiveis = {
-            "iptu_ctm_geo_area_do_terreno": "Área (IPTU CTM GEO)",
+            "iptu_ctm_geo_area": "Área (IPTU CTM GEO)",
+            "iptu_ctm_geo_area_terreno": "Área do Terreno (IPTU CTM GEO)",
             "lote_cp_ativo_area_informada": "Área Informada (Lote CP - Ativo)",
             "endereco_ctmgeo": "Endereço (CTM GEO)",
         }
         chaves = [
-            "iptu_ctm_geo_area_do_terreno",
+            "iptu_ctm_geo_area",
+            "iptu_ctm_geo_area_terreno",
             "lote_cp_ativo_area_informada",
             "endereco_ctmgeo",
         ]
@@ -357,12 +364,19 @@ def gerar_relatorio(
 
     # 6. Projeto, Alvará e Baixa de Construção
     if dados_projeto:
-        chaves_projeto = ["tipo", "requerimento", "ultima_alteracao", "area_lotes"]
+        chaves_projeto = [
+            "tipo",
+            "requerimento",
+            "ultima_alteracao",
+            "area_lotes",
+            "area_construida",
+        ]
         nomes_legiveis_projeto = {
             "tipo": "Tipo",
             "requerimento": "Requerimento",
             "ultima_alteracao": "Última Alteração",
             "area_lotes": "Área do(s) lote(s)",
+            "area_construida": "Área Construída",
         }
         dados_projeto_temp = dados_projeto if dados_projeto else {}
         gerar_tabela_secao(

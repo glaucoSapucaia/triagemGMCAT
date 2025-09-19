@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+import re
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -190,7 +191,8 @@ class SiatuAuto:
         """
         try:
             logger.info(
-                "Iniciando download de anexos para índice: %s", indice_cadastral
+                "==== INICIANDO download de anexos para índice: %s ====",
+                indice_cadastral,
             )
 
             # Clicar no link "Anexos"
@@ -198,66 +200,80 @@ class SiatuAuto:
                 EC.element_to_be_clickable((By.XPATH, "//a[text()='Anexos']"))
             )
             self._click(link_anexos)
-            time.sleep(2)  # tempo para a página carregar
-            logger.info("Link 'Anexos' clicado")
+            logger.info(
+                "Link 'Anexos' clicado, aguardando 2 segundos para carregar a página..."
+            )
+            time.sleep(2)
 
+            # Janela principal
+            janela_principal = self.driver.current_window_handle
+            logger.info("Janela principal armazenada: %s", janela_principal)
+
+            # Busca todos os PDFs na primeira tabela
+            anexos_pdf = self.driver.find_elements(
+                By.XPATH,
+                "//table[.//b[text()='Imagens anexadas']]/preceding::table[1]//tr/td[1]/a"
+                "[contains(@onclick, 'exibeDocumento') and "
+                "contains(translate(text(), 'PDF','pdf'), '.pdf')]",
+            )
+
+            if not anexos_pdf:
+                logger.info("Nenhum PDF disponível para download")
+                return 0
+
+            logger.info("Número de PDFs encontrados inicialmente: %d", len(anexos_pdf))
             qtd_anexos = 0
-            i = 0
 
-            while True:
-                # Reconsulta os anexos a cada iteração para evitar StaleElementReferenceException
-                anexos = self.driver.find_elements(
+            for i, _ in enumerate(anexos_pdf, start=1):
+                # Refetch para evitar StaleElementReference
+                logger.info("Refazendo refetch para evitar StaleElementReference...")
+                anexos_pdf_refetch = self.driver.find_elements(
                     By.XPATH,
-                    "//table//tr/td[1]/a[contains(@onclick, 'exibeDocumento')]",
+                    "//table[.//b[text()='Imagens anexadas']]/preceding::table[1]//tr/td[1]/a"
+                    "[contains(@onclick, 'exibeDocumento') and "
+                    "contains(translate(text(), 'PDF','pdf'), '.pdf')]",
                 )
 
-                if i >= len(anexos):
-                    break
+                if i - 1 >= len(anexos_pdf_refetch):
+                    logger.warning("PDF %d não encontrado após refetch, pulando...", i)
+                    continue
 
-                anexo_atual = anexos[i]
-                nome_arquivo = anexo_atual.text.strip()
-
-                # Se não for PDF, interrompe (abaixo não haverá PDFs)
-                if not nome_arquivo.lower().endswith(".pdf"):
-                    logger.info(
-                        "Fim da lista de PDFs (anexo %d não é PDF: %s)",
-                        i + 1,
-                        nome_arquivo,
-                    )
-                    break
-
-                qtd_anexos += 1
-
-                # Guardar a janela principal antes do clique
-                janela_principal = self.driver.current_window_handle
-
+                anexo = anexos_pdf_refetch[i - 1]
+                nome_arquivo_raw = anexo.text.strip()
+                nome_arquivo = self._sanitize_filename(nome_arquivo_raw)
                 arquivo_caminho = os.path.join(self.pasta_download, nome_arquivo)
-                self._click(anexo_atual)
-                logger.info("Anexo %d clicado: %s", i + 1, nome_arquivo)
+
+                logger.info(
+                    "Processando PDF %d/%d: %s", i, len(anexos_pdf), nome_arquivo_raw
+                )
+                self._click(anexo)
+                logger.info("Clique realizado no PDF: %s", nome_arquivo_raw)
 
                 # Espera o download concluir
                 if self._esperar_download_concluir(arquivo_caminho, timeout=120):
-                    logger.info("Download concluído: %s", nome_arquivo)
+                    logger.info("Download concluído: %s", nome_arquivo_raw)
                 else:
                     logger.warning(
-                        "Download NÃO concluído no tempo limite: %s", nome_arquivo
+                        "Download NÃO concluído no tempo limite: %s", nome_arquivo_raw
                     )
 
-                # Fecha janelas extras que possam ter sido abertas
-                janelas_atuais = self.driver.window_handles
-                for janela in janelas_atuais:
+                # Fecha janelas extras
+                for janela in self.driver.window_handles:
                     if janela != janela_principal:
+                        logger.info("Fechando janela extra: %s", janela)
                         self.driver.switch_to.window(janela)
                         self.driver.close()
 
-                # Volta para a janela principal
+                # Retorna para a janela principal
                 self.driver.switch_to.window(janela_principal)
+                logger.info("Retornando para a janela principal: %s", janela_principal)
 
-                i += 1
+                qtd_anexos += 1
 
-            if qtd_anexos == 0:
-                logger.info("Nenhum PDF disponível para download")
-
+            logger.info(
+                "==== Download de anexos finalizado. Total de PDFs processados: %d ====",
+                qtd_anexos,
+            )
             return qtd_anexos
 
         except TimeoutException as e:
@@ -365,15 +381,52 @@ class SiatuAuto:
 
         return dados
 
-    def _esperar_download_concluir(self, caminho_arquivo, timeout=60):
+    def _esperar_download_concluir(self, caminho_arquivo, timeout=120):
         """
-        Espera até que o arquivo (seção anexos do siatu) seja completamente baixado.
+        Espera até que o arquivo seja completamente baixado na pasta de destino.
+        Funciona mesmo que o navegador use nomes temporários diferentes.
         """
+        pasta = os.path.dirname(caminho_arquivo)
+        nome_base = self._sanitize_filename(os.path.basename(caminho_arquivo))
+        temporarios = (".crdownload", ".part", ".tmp")
         inicio = time.time()
+
+        # Mapear arquivos existentes e seus tamanhos
+        try:
+            arquivos_anteriores = {
+                f: os.path.getsize(os.path.join(pasta, f)) for f in os.listdir(pasta)
+            }
+        except FileNotFoundError:
+            arquivos_anteriores = {}
+
         while True:
-            tmp = caminho_arquivo + ".crdownload"
-            if os.path.exists(caminho_arquivo) and not os.path.exists(tmp):
-                return True
+            try:
+                arquivos_atuais = {
+                    f: os.path.getsize(os.path.join(pasta, f))
+                    for f in os.listdir(pasta)
+                }
+            except FileNotFoundError:
+                arquivos_atuais = {}
+
+            for f, tamanho in arquivos_atuais.items():
+                if f.endswith(temporarios):
+                    continue  # ignora arquivos temporários
+                sanitized = self._sanitize_filename(f)
+                # Detecta se é novo ou mudou de tamanho
+                if (
+                    sanitized == nome_base
+                    or (f not in arquivos_anteriores)
+                    or (arquivos_anteriores.get(f) != tamanho)
+                ):
+                    logger.info("Arquivo detectado como concluído: %s", f)
+                    return True
+
             if time.time() - inicio > timeout:
+                logger.warning("Timeout aguardando download: %s", caminho_arquivo)
                 return False
-            time.sleep(0.5)
+
+            time.sleep(0.2)
+
+    def _sanitize_filename(self, nome):
+        """Remove caracteres inválidos em nomes de arquivos no Windows."""
+        return re.sub(r'[<>:"/\\|?*]', "_", nome)

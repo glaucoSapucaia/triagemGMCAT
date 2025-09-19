@@ -326,4 +326,17 @@ class UrbanoAuto:
         except Exception:
             dados["area_lotes"] = "Não informado"
 
+        try:
+            # Área construída
+            area_construida_elem = self.driver.find_element(
+                By.ID, "pb_area_total_visualizacao"
+            )
+            # Pega apenas o texto do span (ex.: "72,93 m²")
+            area_construida_span = area_construida_elem.find_element(
+                By.TAG_NAME, "span"
+            )
+            dados["area_construida"] = area_construida_span.text.strip()
+        except Exception:
+            dados["area_construida"] = "Não informado"
+
         return dados
