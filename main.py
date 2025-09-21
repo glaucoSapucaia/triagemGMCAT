@@ -30,10 +30,14 @@ def criar_driver(pasta_indice=None, caminho_perfil=None, nome_perfil="Default"):
     :param nome_perfil: nome do perfil do Chrome (ex.: "Default", "Profile 1").
     """
     chrome_options = Options()
-    chrome_options.add_argument("--start-maximized")
+    # chrome_options.add_argument("--start-maximized")
+    chrome_options.add_argument("--headless=new")  # Executa o Chrome em modo headless
     chrome_options.add_argument("--disable-popup-blocking")
     chrome_options.add_argument("--ignore-certificate-errors")
     chrome_options.add_argument("--disable-extensions")
+
+    # Definir resolução para prints em tela cheia
+    chrome_options.add_argument("--window-size=1920,1080")
 
     # Usar um perfil já existente do Chrome
     if caminho_perfil:

@@ -1,5 +1,6 @@
 import os
 import re
+import logging
 from reportlab.platypus import Table, TableStyle
 from reportlab.lib.pagesizes import A4
 from urllib.parse import quote
@@ -7,14 +8,22 @@ from reportlab.platypus import (
     SimpleDocTemplate,
     Paragraph,
     Spacer,
-    ListFlowable,
-    ListItem,
     HRFlowable,
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib import colors
 from datetime import datetime
+
+# Configuração básica do logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+if not logger.handlers:
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
 
 
 def normalizar_nome(arq: str) -> str:
@@ -62,6 +71,7 @@ def gerar_relatorio(
         chaves_area = [
             "lote_cp_ativo_area_informada",
             "iptu_ctm_geo_area",
+            "iptu_ctm_geo_area_construida",
             "iptu_ctm_geo_area_terreno",
             "area_construida",
             "area_lotes",
@@ -211,17 +221,6 @@ def gerar_relatorio(
             elementos.append(Paragraph(texto_secao, estilo_texto))
         elementos.append(Spacer(1, 12))
 
-    # Adiciona anexos às seções com o prefixo "./" no href (para abrir localmente com links relativos)
-    def adicionar_anexos(lista_arquivos):
-        for arq in lista_arquivos:
-            # Normaliza o do nome do arquivo para o link
-            href = "./" + quote(
-                arq,
-                safe="._-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
-            )
-            elementos.append(Paragraph(f'<a href="{href}">{arq}</a>', estilo_link))
-            elementos.append(Spacer(1, 5))
-
     # Prepara anexos (com renomeação no disco para nomes seguros)
     anexos_planta, anexos_siatu, anexos_projetos, anexos_sisctm, anexos_google = (
         [],
@@ -325,14 +324,16 @@ def gerar_relatorio(
     # 4. SISCTM
     if dados_sisctm:
         nomes_legiveis = {
-            "iptu_ctm_geo_area": "Área (IPTU CTM GEO)",
+            "iptu_ctm_geo_area_construida": "Área Construída (IPTU CTM GEO)",
             "iptu_ctm_geo_area_terreno": "Área do Terreno (IPTU CTM GEO)",
+            "iptu_ctm_geo_area": "Área (IPTU CTM GEO)",
             "lote_cp_ativo_area_informada": "Área Informada (Lote CP - Ativo)",
             "endereco_ctmgeo": "Endereço (CTM GEO)",
         }
         chaves = [
-            "iptu_ctm_geo_area",
+            "iptu_ctm_geo_area_construida",
             "iptu_ctm_geo_area_terreno",
+            "iptu_ctm_geo_area",
             "lote_cp_ativo_area_informada",
             "endereco_ctmgeo",
         ]
@@ -421,26 +422,214 @@ def gerar_relatorio(
     # OBSERVAÇÕES
     # adicionar_secao("7. Observações Gerais", "Observações de exemplo.")
 
-    # 8. CONCLUSÃO
-    if dados_planta and dados_sisctm:
-        endereco_siatu = dados_planta.get("endereco_imovel", "")
-        endereco_ctm = dados_sisctm.get("endereco_ctmgeo", "")
+    # --- 8. CONCLUSÃO ---
+    adicionar_secao("8. Conclusão Parcial")
 
+    # ===== Endereços =====
+    endereco_siatu = dados_planta.get("endereco_imovel", "") if dados_planta else ""
+    endereco_ctm = dados_sisctm.get("endereco_ctmgeo", "") if dados_sisctm else ""
+
+    logger.info("Endereço SIATU: %s", endereco_siatu)
+    logger.info("Endereço IPTU CTMGEO: %s", endereco_ctm)
+
+    if endereco_siatu and endereco_ctm:
         rua_s, numero_s, cep_s = extrair_elementos_para_comparacao(endereco_siatu)
         rua_c, numero_c, cep_c = extrair_elementos_para_comparacao(endereco_ctm)
 
-        if (rua_s, numero_s, cep_s) == (rua_c, numero_c, cep_c):
-            texto_conclusao = "Endereço SIATU e CTM GEO são iguais."
-        else:
-            texto_conclusao = "Endereço SIATU e CTM GEO são diferentes."
-
-        # Adiciona na seção de conclusão
-        adicionar_secao("8. Conclusão Parcial", texto_conclusao)
-    else:
-        adicionar_secao(
-            "8. Conclusão Parcial",
-            "Não há dados para analise.",
+        logger.info(
+            "Extraído do SIATU -> Rua: %s, Número: %s, CEP: %s", rua_s, numero_s, cep_s
         )
+        logger.info(
+            "Extraído do CTMGEO -> Rua: %s, Número: %s, CEP: %s", rua_c, numero_c, cep_c
+        )
+
+        if None in (rua_s, numero_s, cep_s, rua_c, numero_c, cep_c):
+            resultado_endereco = "Não foi possível comparar (dados faltando)"
+            logger.warning(
+                "Algum dado de endereço está faltando, não foi possível comparar"
+            )
+        else:
+            resultado_endereco = (
+                "Iguais"
+                if (rua_s, numero_s, cep_s) == (rua_c, numero_c, cep_c)
+                else "Diferentes"
+            )
+            logger.info("Resultado comparação endereços: %s", resultado_endereco)
+
+        data_endereco = [
+            ["Endereço", ""],
+            [
+                "Endereço SIATU",
+                Paragraph(endereco_siatu or "Não informado", style_normal),
+            ],
+            [
+                "Endereço IPTU CTMGEO",
+                Paragraph(endereco_ctm or "Não informado", style_normal),
+            ],
+            ["Resultado", Paragraph(resultado_endereco, style_normal)],
+        ]
+
+        tabela_endereco = Table(data_endereco, colWidths=[200, 300])
+        tabela_endereco.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.lightblue),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 10),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                    ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+                    ("TEXTCOLOR", (0, -1), (-1, -1), colors.darkblue),
+                ]
+            )
+        )
+        elementos.append(tabela_endereco)
+        elementos.append(Spacer(1, 12))
+
+    # ===== Áreas =====
+    def limpar_area(valor):
+        """Converte string de área em formato brasileiro ou internacional para float."""
+        if not valor:
+            return None
+        v = str(valor).lower().replace("m²", "").replace("m2", "").strip()
+
+        # Detecta se é formato brasileiro com vírgula decimal
+        if "," in v and "." in v:
+            # '1.088,24' -> '1088.24'
+            v = v.replace(".", "").replace(",", ".")
+        elif "," in v:
+            # '1088,24' -> '1088.24'
+            v = v.replace(",", ".")
+        # se tiver apenas ponto, assume decimal internacional
+        v = re.sub(r"[^\d\.]", "", v)
+        return v
+
+    def parse_area(valor):
+        if not valor or str(valor).strip().lower() in ["não informado", ""]:
+            return None
+        try:
+            resultado = float(limpar_area(valor))
+            logger.info("Parse área: '%s' -> %f", valor, resultado)
+            return resultado
+        except Exception as e:
+            logger.error("Erro ao parsear área '%s': %s", valor, e)
+            return None
+
+    def formatar_area(valor):
+        if valor is None:
+            return "Não informado"
+        try:
+            resultado = (
+                f"{valor:,.2f} m²".replace(",", "X").replace(".", ",").replace("X", ".")
+            )
+            logger.debug("Formatar área: %f -> %s", valor, resultado)
+            return resultado
+        except Exception as e:
+            logger.error("Erro ao formatar área '%s': %s", valor, e)
+            return str(valor)
+
+    def comparar_areas(nome_a, a, nome_b, b):
+        logger.info("Comparando áreas: %s=%s vs %s=%s", nome_a, a, nome_b, b)
+        if a is not None and b is not None:
+            if a == b:
+                resultado = f"{nome_a} e {nome_b} são iguais."
+            else:
+                diferenca = ((a - b) / b) * 100 if b else 0
+                resultado = f"{nome_a} é {abs(diferenca):.1f}% {'maior' if diferenca > 0 else 'menor'} que {nome_b}."
+            logger.info("Resultado comparação: %s", resultado)
+            return resultado
+        logger.warning("Não foi possível comparar: um dos valores é None")
+        return None
+
+    # Extrair valores numéricos
+    a_pb = parse_area(dados_planta.get("area_construida") if dados_planta else None)
+    a_iptu = parse_area(
+        dados_sisctm.get("iptu_ctm_geo_area_construida") if dados_sisctm else None
+    )
+    a_urb = parse_area(dados_projeto.get("area_construida") if dados_projeto else None)
+
+    # Formatar só para exibir na tabela
+    area_pb = formatar_area(a_pb)
+    area_iptu = formatar_area(a_iptu)
+    area_urbano = formatar_area(a_urb)
+
+    logger.info(
+        "Áreas formatadas -> PB: %s, IPTU: %s, URBANO: %s",
+        area_pb,
+        area_iptu,
+        area_urbano,
+    )
+
+    # Comparações
+    comparacoes = []
+    if a_pb is not None and a_urb is not None:
+        comparacoes.append(
+            [
+                "Resultado PB x URBANO",
+                Paragraph(
+                    comparar_areas("Área PB", a_pb, "Área URBANO", a_urb), style_normal
+                ),
+            ]
+        )
+    if a_pb is not None and a_iptu is not None:
+        comparacoes.append(
+            [
+                "Resultado PB x IPTU CTMGEO",
+                Paragraph(
+                    comparar_areas("Área PB", a_pb, "Área IPTU CTMGEO", a_iptu),
+                    style_normal,
+                ),
+            ]
+        )
+    if a_iptu is not None and a_urb is not None:
+        comparacoes.append(
+            [
+                "Resultado IPTU CTMGEO x URBANO",
+                Paragraph(
+                    comparar_areas("Área IPTU CTMGEO", a_iptu, "Área URBANO", a_urb),
+                    style_normal,
+                ),
+            ]
+        )
+
+    # Montar tabela de áreas
+    if comparacoes:
+        data_area = [
+            ["Área Construída", ""],
+            ["Área PB", Paragraph(area_pb, style_normal)],
+            ["Área IPTU CTMGEO", Paragraph(area_iptu, style_normal)],
+            ["Área URBANO", Paragraph(area_urbano, style_normal)],
+        ] + comparacoes
+
+        logger.info("Tabela de áreas montada com %d linhas", len(data_area))
+
+        tabela_area = Table(data_area, colWidths=[200, 300])
+        tabela_area.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.lightblue),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 10),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                    ("FONTNAME", (0, 4), (-1, -1), "Helvetica-Bold"),
+                    ("TEXTCOLOR", (0, 4), (-1, -1), colors.darkblue),
+                ]
+            )
+        )
+        elementos.append(tabela_area)
+        elementos.append(Spacer(1, 12))
+
+    # ===== Se nada foi adicionado =====
+    if (
+        len(elementos) == 0
+        or (not endereco_siatu or not endereco_ctm)
+        and len(comparacoes) == 0
+    ):
+        adicionar_secao("8. Conclusão Parcial", "Não há dados para análise.")
+        logger.warning("Nenhum dado de endereço ou área disponível para análise.")
 
     # Gera o PDF
     doc.build(elementos)

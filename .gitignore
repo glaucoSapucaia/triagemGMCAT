@@ -1,7 +1,15 @@
+# Ambiente
 venv/
 __pycache__/
+
+# Resultados gerais
 Resultados*/
+
+# Logs
 logs.*
+
+# Script que verifica indices duplicaodos
+indices_duplicados.py
 
 # Pasta criada na execução do ubuntu com confiurações windows.
 C:*
