@@ -1,14 +1,16 @@
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
+
+from utils import logger
+
 import time
-import logging
 import os
 
 
 class GoogleMapsAuto:
     """
-    Classe para automatizar tarefas relacionadas ao Google Earth via Selenium.
+    Classe para automatizar tarefas relacionadas ao Google Maps via Selenium.
     """
 
     def __init__(self, driver, url: str, endereco, pasta_download, timeout: int = 10):
@@ -31,86 +33,84 @@ class GoogleMapsAuto:
             self.driver.execute_script("arguments[0].click();", element)
 
     def acessar_google_maps(self):
-        """Abre a página inicial do Google Earth."""
+        """Abre a página inicial do Google Maps."""
         try:
             self.driver.get(self.url)
-            logging.info(f"Acessando Google Earth: {self.url}")
-            time.sleep(3)  # espera a página carregar (ajustável)
+            logger.info(f"Acessando Google Maps")
+            time.sleep(3)
             return True
         except Exception as e:
-            logging.error(f"Erro ao localizar campo de busca: {e}")
+            logger.error(f"Erro ao acessar o Google Maps: {e}")
             return
 
     def navegar(self):
         """Navega até o endereço, muda para satélite, faz prints e Street View."""
-        # 1. Inserir endereço no campo de busca
+        # Insere endereço no campo de busca
         try:
             search_input = self.wait.until(
                 EC.presence_of_element_located((By.ID, "searchboxinput"))
             )
             search_input.clear()
-            if self.endereco == "Não encontrado":
-                logging.warning(
-                    "Endereço não encontrado, pulando navegação google maps."
-                )
+            if self.endereco == "Não encontrado" or not self.endereco:
+                logger.warning("IC sem endereço, pulando navegação google maps.")
                 return
             search_input.send_keys(self.endereco)
-            logging.info(f"Endereço digitado: {self.endereco}")
+            logger.info(f"Endereço digitado")
         except Exception as e:
-            logging.error(f"Erro ao localizar campo de busca: {e}")
+            logger.error(f"Erro ao localizar campo de busca: {e}")
             return
 
-        # 2. Clicar no botão pesquisar
+        # Clica no botão pesquisar
         try:
             search_button = self.wait.until(
                 EC.element_to_be_clickable((By.ID, "searchbox-searchbutton"))
             )
             self._click(search_button)
-            logging.info("Clique no botão pesquisar")
-            time.sleep(5)  # espera o mapa atualizar
+            logger.info("Clique no botão pesquisar")
+            time.sleep(5)
         except Exception as e:
-            logging.error(f"Erro ao clicar no botão pesquisar: {e}")
+            logger.error(f"Erro ao clicar no botão pesquisar: {e}")
             return
 
-        # 3. Clicar no botão de camada (satélite)
+        # Clica no botão de camada (satélite)
         try:
             satellite_button = self.wait.until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "button.yHc72.qk5Wte"))
             )
             self._click(satellite_button)
-            logging.info("Visualização satélite ativada")
+            logger.info("Visualização satélite ativada")
             time.sleep(3)
         except Exception as e:
-            logging.warning(f"Não foi possível ativar visualização satélite: {e}")
+            logger.warning(f"Não foi possível ativar visualização satélite: {e}")
 
-        # 4. Print da tela (satélite)
+        # Print da tela (satélite)
         try:
             caminho_print_aereo = os.path.join(
                 self.pasta_download, "google_maps_aereo.png"
             )
             self.driver.save_screenshot(caminho_print_aereo)
-            logging.info(f"Print da visualização aérea salvo em: {caminho_print_aereo}")
+            logger.info(f"Print da visualização aérea salvo")
         except Exception as e:
-            logging.error(f"Erro ao salvar print da visualização aérea: {e}")
+            logger.error(f"Erro ao salvar print da visualização aérea: {e}")
 
-        # 5. Clicar no botão para visualizar a fachada (Street View)
+        # Clica no botão para visualizar a fachada (Street View)
         try:
             street_view_button = self.wait.until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "button.dQDAle"))
             )
             self._click(street_view_button)
-            logging.info("Street View ativado")
-            time.sleep(5)  # espera Street View carregar
+            logger.info("Street View ativado")
+            time.sleep(5)
         except Exception as e:
-            logging.warning(f"Não foi possível abrir Street View: {e}")
+            logger.warning(f"Não foi possível clicar no Street View: {e}")
             return
 
-        # 6. Print da tela (fachada)
+        # Print da tela (fachada)
         try:
             caminho_print_fachada = os.path.join(
                 self.pasta_download, "google_maps_fachada.png"
             )
             self.driver.save_screenshot(caminho_print_fachada)
-            logging.info(f"Print da fachada salvo em: {caminho_print_fachada}")
+            logger.info(f"Print da fachada salvo")
         except Exception as e:
-            logging.error(f"Erro ao salvar print da fachada: {e}")
+            logger.error(f"Erro ao salvar print da fachada: {e}")

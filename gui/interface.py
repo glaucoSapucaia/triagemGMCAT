@@ -1,6 +1,7 @@
+from utils import logger
+
 import tkinter as tk
 from tkinter import messagebox
-import logging
 
 
 def iniciar_interface():
@@ -23,7 +24,7 @@ def iniciar_interface():
 
                 root.destroy()
             except Exception as e:
-                logging.error(f"Erro na interface ao confirmar: {e}")
+                logger.error(f"Erro na interface ao confirmar: {e}")
                 messagebox.showerror("Erro", str(e))
 
         root = tk.Tk()
@@ -48,5 +49,5 @@ def iniciar_interface():
         root.mainloop()
         return credenciais, indices
     except Exception as e:
-        logging.critical(f"Erro crítico na interface: {e}")
+        logger.error(f"Erro crítico na interface: {e}")
         raise

@@ -1,15 +1,26 @@
-import logging
 import time
 import os
+
+from utils import logger
+
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
-logger = logging.getLogger(__name__)
-
 
 class UrbanoAuto:
+    """
+    Classe para automatizar tarefas relacionadas ao sistema Urbano via Selenium.
+
+    Parâmetros:
+        driver (selenium.webdriver): Instância do WebDriver para controle do navegador.
+        url (str): URL de login ou página inicial do sistema Urbano.
+        usuario (str): Nome de usuário para autenticação no sistema.
+        senha (str): Senha do usuário para autenticação.
+        pasta_download (str): Caminho da pasta onde os arquivos baixados serão armazenados.
+    """
+
     def __init__(self, driver, url, usuario, senha, pasta_download):
         self.driver = driver
         self.url = url
@@ -28,7 +39,7 @@ class UrbanoAuto:
     def acessar(self):
         """Abre o sistema Urbano."""
         try:
-            logger.info("Acessando o sistema Urbano: %s", self.url)
+            logger.info("Acessando o sistema 2: URBANO")
             self.driver.get(self.url)
             return True
         except Exception as e:
@@ -115,13 +126,13 @@ class UrbanoAuto:
                 EC.element_to_be_clickable((By.ID, "btnPesquisar"))
             )
             self._click(btn_pesquisar)
-            time.sleep(15)  # Aguarda página carregar
+            time.sleep(15)
 
             # Scroll para o print (caso necessário)
             self.driver.execute_script(
                 "window.scrollTo(0, document.body.scrollHeight);"
             )
-            time.sleep(2)  # Aguarda scroll
+            time.sleep(2)
 
             # Verifica a tabela e conta projetos
             try:
@@ -143,7 +154,7 @@ class UrbanoAuto:
                         self.pasta_download, "Pesquisa de Projeto.png"
                     )
                     self.driver.save_screenshot(screenshot_path)
-                    logger.info("Print da tela salvo em: %s", screenshot_path)
+                    logger.info("Print da tela salvo")
 
                     return 0, dados_projeto
 
@@ -156,7 +167,7 @@ class UrbanoAuto:
                 )  # Aguarda carregar a página do projeto (geralmente demora)
 
             except NoSuchElementException:
-                logger.info("Tabela de resultados não encontrada")
+                logger.info("Projetos não encontrados na pesquisa")
                 dados_projeto = self._capturar_dados_projeto(
                     nome_arquivo="Não informado"
                 )
@@ -164,7 +175,7 @@ class UrbanoAuto:
                 # Print da pesquisa em caso de erros
                 screenshot_path = os.path.join(self.pasta_download, "Sem_Projeto.png")
                 self.driver.save_screenshot(screenshot_path)
-                logger.info("Print da tela salvo em: %s", screenshot_path)
+                logger.info("Print da tela salvo")
 
                 return 0, dados_projeto
 
@@ -227,7 +238,7 @@ class UrbanoAuto:
 
                 # Aguarda aparecer o painel "Pranchas do Projeto"
                 try:
-                    time.sleep(15)  # Espera extra para garantir carregamento
+                    time.sleep(15)
                     self.wait.until(
                         EC.presence_of_element_located(
                             (By.XPATH, "//h3[contains(text(),'Pranchas do Projeto')]")
@@ -266,7 +277,7 @@ class UrbanoAuto:
                         )
 
                     logger.info("Download iniciado para: %s", nome_arquivo)
-                    time.sleep(10)  # Espera download
+                    time.sleep(10)
 
                     dados_projeto = self._capturar_dados_projeto(nome_arquivo="Projeto")
                     return qtd_projetos, dados_projeto
@@ -291,7 +302,7 @@ class UrbanoAuto:
         Caso algum campo não seja encontrado, retorna 'Não informado'.
         """
         dados = {}
-        time.sleep(2)  # Pequena espera para garantir carregamento
+        time.sleep(2)
 
         # Tipo: nome do arquivo
         dados["tipo"] = nome_arquivo if nome_arquivo else "Não informado"

@@ -1,16 +1,27 @@
-import logging
 import os
 import time
 import re
+
+from utils import logger
+
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
-logger = logging.getLogger(__name__)
-
 
 class SiatuAuto:
+    """
+    Classe para automatizar tarefas relacionadas ao SIATU via Selenium.
+
+    Parâmetros:
+        driver (selenium.webdriver): Instância do WebDriver para controle do navegador.
+        url (str): URL de login ou página inicial do SIATU.
+        usuario (str): Nome de usuário para autenticação no sistema.
+        senha (str): Senha do usuário para autenticação.
+        pasta_download (str): Caminho da pasta onde os arquivos baixados serão armazenados.
+    """
+
     def __init__(self, driver, url, usuario, senha, pasta_download):
         self.driver = driver
         self.url = url
@@ -32,7 +43,7 @@ class SiatuAuto:
         Aceessa a página inicial do sistema Siatu.
         """
         try:
-            logger.info("Acessando o Sistema 1: %s", self.url)
+            logger.info("Acessando o Sistema 1: SIATU")
             self.driver.get(self.url)
             return True
         except Exception as e:
@@ -191,7 +202,7 @@ class SiatuAuto:
         """
         try:
             logger.info(
-                "==== INICIANDO download de anexos para índice: %s ====",
+                "Iniciando download de anexos para índice: %s",
                 indice_cadastral,
             )
 
@@ -200,14 +211,11 @@ class SiatuAuto:
                 EC.element_to_be_clickable((By.XPATH, "//a[text()='Anexos']"))
             )
             self._click(link_anexos)
-            logger.info(
-                "Link 'Anexos' clicado, aguardando 2 segundos para carregar a página..."
-            )
+            logger.info("Link 'Anexos' clicado")
             time.sleep(2)
 
             # Janela principal
             janela_principal = self.driver.current_window_handle
-            logger.info("Janela principal armazenada: %s", janela_principal)
 
             # Busca todos os PDFs na primeira tabela
             anexos_pdf = self.driver.find_elements(
@@ -226,7 +234,6 @@ class SiatuAuto:
 
             for i, _ in enumerate(anexos_pdf, start=1):
                 # Refetch para evitar StaleElementReference
-                logger.info("Refazendo refetch para evitar StaleElementReference...")
                 anexos_pdf_refetch = self.driver.find_elements(
                     By.XPATH,
                     "//table[.//b[text()='Imagens anexadas']]/preceding::table[1]//tr/td[1]/a"
@@ -243,15 +250,13 @@ class SiatuAuto:
                 nome_arquivo = self._sanitize_filename(nome_arquivo_raw)
                 arquivo_caminho = os.path.join(self.pasta_download, nome_arquivo)
 
-                logger.info(
-                    "Processando PDF %d/%d: %s", i, len(anexos_pdf), nome_arquivo_raw
-                )
+                logger.info("Processando PDF %d/%d", i, len(anexos_pdf))
                 self._click(anexo)
-                logger.info("Clique realizado no PDF: %s", nome_arquivo_raw)
+                logger.info("Clique realizado no PDF")
 
                 # Espera o download concluir
                 if self._esperar_download_concluir(arquivo_caminho, timeout=120):
-                    logger.info("Download concluído: %s", nome_arquivo_raw)
+                    logger.info("Download concluído")
                 else:
                     logger.warning(
                         "Download NÃO concluído no tempo limite: %s", nome_arquivo_raw
@@ -260,18 +265,16 @@ class SiatuAuto:
                 # Fecha janelas extras
                 for janela in self.driver.window_handles:
                     if janela != janela_principal:
-                        logger.info("Fechando janela extra: %s", janela)
                         self.driver.switch_to.window(janela)
                         self.driver.close()
 
                 # Retorna para a janela principal
                 self.driver.switch_to.window(janela_principal)
-                logger.info("Retornando para a janela principal: %s", janela_principal)
 
                 qtd_anexos += 1
 
             logger.info(
-                "==== Download de anexos finalizado. Total de PDFs processados: %d ====",
+                "Download de anexos finalizado. Total de PDFs processados: %d",
                 qtd_anexos,
             )
             return qtd_anexos
@@ -326,9 +329,6 @@ class SiatuAuto:
         except Exception:
             dados["endereco_imovel"] = "Não informado"
 
-        # DEBUG
-        # print(dados["endereco_imovel"])
-
         # CAPTURA TODOS OS VALORES DE ÁREA CONSTRUÍDA
         try:
             area_elems = self.driver.find_elements(
@@ -358,7 +358,7 @@ class SiatuAuto:
                 "//table[contains(@class,'table_item')][.//td[text()='Matrícula de Registro']]//tr[2]/td[@class='valor_campo']",
             )
             valor = matricula_elem.text
-            if valor and valor.strip():  # se não for None e não for vazio
+            if valor and valor.strip():
                 dados["matricula_registro"] = valor.strip()
             else:
                 dados["matricula_registro"] = "Não informado"
@@ -418,7 +418,6 @@ class SiatuAuto:
                     or (f not in arquivos_anteriores)
                     or (arquivos_anteriores.get(f) != tamanho)
                 ):
-                    logger.info("Arquivo detectado como concluído: %s", f)
                     return True
 
             if time.time() - inicio > timeout:
