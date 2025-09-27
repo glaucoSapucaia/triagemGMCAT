@@ -217,7 +217,7 @@ def gerar_relatorio(
             arq = nome_norm
 
             # Classificação dos anexos
-            if "Planta_Basica" in arq:
+            if "Planta_Basica" in arq or "alteracoes_siatu" in arq.lower():
                 anexos_planta.append(arq)
             elif (
                 "sem_projeto" in arq.lower()
@@ -251,11 +251,11 @@ def gerar_relatorio(
     # 2. Planta Básica - Exercício Seguinte e/ou Recalculado e/ou Primeiro do Ano
     logger.info("Adicionando seção 2: Planta Básica")
     if dados_planta:
-        chaves_pb = ["area_construida", "exercicio", "tipo_uso", "endereco_imovel"]
+        chaves_pb = ["area_construida", "exercicio", "patrimonio", "endereco_imovel"]
         nomes_legiveis_pb = {
             "area_construida": "Área Construída Total",
             "exercicio": "Exercício",
-            "tipo_uso": "Tipo de uso",
+            "patrimonio": "Patrimônio",
             "endereco_imovel": "Endereço do Imóvel (SIATU)",
         }
         gerar_tabela_secao(

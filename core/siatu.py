@@ -184,6 +184,8 @@ class SiatuAuto:
                 except TimeoutException:
                     logger.info(f"Link '{nome}' não encontrado, seguindo...")
 
+            self._print_alteracoes()
+
             return dados_PB
 
         except TimeoutException as e:
@@ -297,6 +299,7 @@ class SiatuAuto:
         Caso não existam, retorna 'Não informado' (texto).
         """
 
+        logger.info("Capturando dados do imóvel na página.")
         dados = {}
 
         # EXERCÍCIO
@@ -309,15 +312,15 @@ class SiatuAuto:
         except Exception:
             dados["exercicio"] = "Não informado"
 
-        # TIPO DE USO
+        # PATRIMÔNIO (substituindo o tipo de uso)
         try:
-            tipo_uso_elem = self.driver.find_element(
+            patrimonio_elem = self.driver.find_element(
                 By.XPATH,
-                "(//table[contains(@class,'table_grid')]//tr[td and count(td)=6])[2]/td[5]",
+                "//td[@class='label_campo' and normalize-space(text())='Patrimônio']/following::td[@class='valor_campo'][1]",
             )
-            dados["tipo_uso"] = tipo_uso_elem.text.strip()
+            dados["patrimonio"] = patrimonio_elem.text.strip()
         except Exception:
-            dados["tipo_uso"] = "Não informado"
+            dados["patrimonio"] = "Não informado"
 
         # ENDEREÇO DO IMÓVEL
         try:
@@ -426,6 +429,33 @@ class SiatuAuto:
                 return False
 
             time.sleep(0.2)
+
+    def _print_alteracoes(self):
+        try:
+            # Clica na aba do menu "Alterações"
+            alteracoes_link = self.driver.find_element(
+                By.XPATH,
+                "//a[contains(@href, 'consultaPlantaBasica') and contains(text(), 'Alterações')]",
+            )
+            alteracoes_link.click()
+            logger.info("Aba 'Alterações' acessada com sucesso.")
+
+            time.sleep(2)
+
+            # Aumenta o zoom antes do print
+            self.driver.execute_script("document.body.style.zoom='200%'")
+            time.sleep(1)
+
+            # Print da tela
+            screenshot_path = os.path.join(self.pasta_download, "alteracoes_siatu.png")
+            self.driver.save_screenshot(screenshot_path)
+            logger.info(f"Print da aba Alterações salvo.")
+
+            # Restaura o zoom original
+            self.driver.execute_script("document.body.style.zoom='100%'")
+
+        except Exception as e:
+            logger.error(f"Erro ao acessar a aba Alterações: {e}")
 
     def _sanitize_filename(self, nome):
         """Remove caracteres inválidos em nomes de arquivos no Windows."""
