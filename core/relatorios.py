@@ -7,7 +7,6 @@ from utils import (
     extrair_elementos_do_endereco_para_comparacao,
     parse_area,
     formatar_area,
-    comparar_areas,
 )
 
 from reportlab.platypus import Table, TableStyle
@@ -65,7 +64,6 @@ def gerar_relatorio(
         chaves_area = [
             "lote_cp_ativo_area_informada",
             "iptu_ctm_geo_area",
-            "iptu_ctm_geo_area_construida",
             "iptu_ctm_geo_area_terreno",
             "area_construida",
             "area_lotes",
@@ -290,14 +288,12 @@ def gerar_relatorio(
     logger.info("Adicionando seção 4: Dados SISCTM")
     if dados_sisctm:
         nomes_legiveis = {
-            "iptu_ctm_geo_area_construida": "Área Construída (IPTU CTM GEO)",
-            "iptu_ctm_geo_area_terreno": "Área do Terreno (IPTU CTM GEO)",
-            "iptu_ctm_geo_area": "Área (IPTU CTM GEO)",
-            "lote_cp_ativo_area_informada": "Área Informada (Lote CP - Ativo)",
+            "iptu_ctm_geo_area_terreno": "Área de Terreno (SIATU)",
+            "iptu_ctm_geo_area": "Área Georeferenciada",
+            "lote_cp_ativo_area_informada": "Área COL",
             "endereco_ctmgeo": "Endereço (CTM GEO)",
         }
         chaves = [
-            "iptu_ctm_geo_area_construida",
             "iptu_ctm_geo_area_terreno",
             "iptu_ctm_geo_area",
             "lote_cp_ativo_area_informada",
@@ -330,15 +326,11 @@ def gerar_relatorio(
     if dados_projeto:
         chaves_projeto = [
             "tipo",
-            "requerimento",
-            "ultima_alteracao",
             "area_lotes",
             "area_construida",
         ]
         nomes_legiveis_projeto = {
             "tipo": "Tipo",
-            "requerimento": "Requerimento",
-            "ultima_alteracao": "Última Alteração",
             "area_lotes": "Área do(s) lote(s)",
             "area_construida": "Área Construída",
         }
@@ -370,7 +362,7 @@ def gerar_relatorio(
     else:
         adicionar_secao("7. Matrícula do Imóvel", "Nenhum dado encontrado.")
 
-    # 8. Conclusão Parcial - Comparações
+    # 8. Conclusão Parcial - Endereço + Áreas
     logger.info("Adicionando seção 8: Conclusão Parcial")
     adicionar_secao("8. Conclusão Parcial")
 
@@ -426,83 +418,39 @@ def gerar_relatorio(
         elementos.append(tabela_endereco)
         elementos.append(Spacer(1, 12))
 
-    # Extrai valores numéricos
+    # Extrai valores numéricos das áreas
     a_pb = parse_area(dados_planta.get("area_construida") if dados_planta else None)
-    a_iptu = parse_area(
-        dados_sisctm.get("iptu_ctm_geo_area_construida") if dados_sisctm else None
-    )
     a_urb = parse_area(dados_projeto.get("area_construida") if dados_projeto else None)
 
-    # Formata valores para exibir na tabela
+    # Formata valores
     area_pb = formatar_area(a_pb)
-    area_iptu = formatar_area(a_iptu)
     area_urbano = formatar_area(a_urb)
 
-    # Comparações
-    comparacoes = []
-    if a_pb is not None and a_urb is not None:
-        comparacoes.append(
-            [
-                "Resultado PB x URBANO",
-                Paragraph(
-                    comparar_areas("Área PB", a_pb, "Área URBANO", a_urb), style_normal
-                ),
-            ]
-        )
-    if a_pb is not None and a_iptu is not None:
-        comparacoes.append(
-            [
-                "Resultado PB x IPTU CTMGEO",
-                Paragraph(
-                    comparar_areas("Área PB", a_pb, "Área IPTU CTMGEO", a_iptu),
-                    style_normal,
-                ),
-            ]
-        )
-    if a_iptu is not None and a_urb is not None:
-        comparacoes.append(
-            [
-                "Resultado IPTU CTMGEO x URBANO",
-                Paragraph(
-                    comparar_areas("Área IPTU CTMGEO", a_iptu, "Área URBANO", a_urb),
-                    style_normal,
-                ),
-            ]
-        )
+    # Monta tabela apenas com os valores de área
+    data_area = [
+        ["Área Construída", ""],
+        ["Área PB", Paragraph(area_pb, style_normal)],
+        ["Área URBANO", Paragraph(area_urbano, style_normal)],
+    ]
 
-    # Monta tabela de áreas
-    if comparacoes:
-        data_area = [
-            ["Área Construída", ""],
-            ["Área PB", Paragraph(area_pb, style_normal)],
-            ["Área IPTU CTMGEO", Paragraph(area_iptu, style_normal)],
-            ["Área URBANO", Paragraph(area_urbano, style_normal)],
-        ] + comparacoes
-
-        tabela_area = Table(data_area, colWidths=[200, 300])
-        tabela_area.setStyle(
-            TableStyle(
-                [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.lightblue),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 10),
-                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-                    ("FONTNAME", (0, 4), (-1, -1), "Helvetica-Bold"),
-                    ("TEXTCOLOR", (0, 4), (-1, -1), colors.darkblue),
-                ]
-            )
+    tabela_area = Table(data_area, colWidths=[200, 300])
+    tabela_area.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.lightblue),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("FONTSIZE", (0, 0), (-1, -1), 10),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+            ]
         )
-        elementos.append(tabela_area)
-        elementos.append(Spacer(1, 12))
+    )
+    elementos.append(tabela_area)
+    elementos.append(Spacer(1, 12))
 
     # Não cria tabelas se não há dados
-    if (
-        len(elementos) == 0
-        or (not endereco_siatu or not endereco_ctm)
-        and len(comparacoes) == 0
-    ):
+    if len(elementos) == 0 or (not endereco_siatu or not endereco_ctm):
         adicionar_secao("8. Conclusão Parcial", "Não há dados para análise.")
 
     # Gera o PDF

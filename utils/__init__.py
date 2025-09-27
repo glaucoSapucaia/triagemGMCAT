@@ -6,7 +6,6 @@ from .relatorio import (
     extrair_elementos_do_endereco_para_comparacao,
     parse_area,
     formatar_area,
-    comparar_areas,
 )
 
 __all__ = [

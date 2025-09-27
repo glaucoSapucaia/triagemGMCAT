@@ -457,21 +457,6 @@ class SisctmAuto:
                 logger.warning("Não foi possível capturar área IPTU CTM GEO")
                 resultado["iptu_ctm_geo_area"] = None
 
-            # Aguarda a linha com "AREA_CONSTRUIDA" existir
-            try:
-                linha_area = WebDriverWait(iptu_item, 5).until(
-                    EC.presence_of_element_located(
-                        (
-                            By.XPATH,
-                            ".//table//tr[td[contains(text(),'AREA_CONSTRUIDA')]]/td[2]",
-                        )
-                    )
-                )
-                resultado["iptu_ctm_geo_area_construida"] = linha_area.text.strip()
-            except TimeoutException:
-                logger.warning("Não foi possível capturar área IPTU CTM GEO")
-                resultado["iptu_ctm_geo_area_construida"] = None
-
             # Aguarda a linha com "AREA_TERRENO" existir
             try:
                 linha_area_terreno = WebDriverWait(iptu_item, 5).until(

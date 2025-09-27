@@ -68,14 +68,3 @@ def formatar_area(valor):
         return resultado
     except Exception as e:
         return str(valor)
-
-
-def comparar_areas(nome_a, a, nome_b, b):
-    if a is not None and b is not None:
-        if a == b:
-            resultado = f"{nome_a} e {nome_b} são iguais."
-        else:
-            diferenca = ((a - b) / b) * 100 if b else 0
-            resultado = f"{nome_a} é {abs(diferenca):.1f}% {'maior' if diferenca > 0 else 'menor'} que {nome_b}."
-        return resultado
-    return None

@@ -262,6 +262,7 @@ class SiatuAuto:
                         "Download NÃO concluído no tempo limite: %s", nome_arquivo_raw
                     )
 
+                time.sleep(1)
                 # Fecha janelas extras
                 for janela in self.driver.window_handles:
                     if janela != janela_principal:

@@ -142,7 +142,7 @@ class UrbanoAuto:
                 )
                 linhas = tabela_div.find_elements(By.TAG_NAME, "tr")
                 qtd_projetos = len(linhas)
-                logger.info("%d projetos encontrados", qtd_projetos)
+                logger.info("%d projeto(s) encontrado(s)", qtd_projetos)
 
                 if qtd_projetos == 0:
                     dados_projeto = self._capturar_dados_projeto(
@@ -296,8 +296,6 @@ class UrbanoAuto:
         """
         Captura os dados do projeto:
         - Tipo: nome do arquivo baixado
-        - Requerimento
-        - Última alteração
         - Área do(s) lote(s)
         Caso algum campo não seja encontrado, retorna 'Não informado'.
         """
@@ -306,26 +304,6 @@ class UrbanoAuto:
 
         # Tipo: nome do arquivo
         dados["tipo"] = nome_arquivo if nome_arquivo else "Não informado"
-
-        try:
-            # Requerimento
-            requerimento_elem = self.driver.find_element(
-                By.XPATH,
-                "//span[@ng-if='$ctrl.ps.modoVisualizacao() || !$ctrl.isNomeEditavel']",
-            )
-            dados["requerimento"] = requerimento_elem.text.strip()
-        except Exception:
-            dados["requerimento"] = "Não informado"
-
-        try:
-            # Localiza o span que contém o texto "Última alteração"
-            # e pega o segundo <small> dentro dele (após o <br>)
-            ultima_alteracao_elem = self.driver.find_element(
-                By.XPATH, "//span[small[text()='Última alteração']]/small[2]"
-            )
-            dados["ultima_alteracao"] = ultima_alteracao_elem.text.strip()
-        except Exception:
-            dados["ultima_alteracao"] = "Não informado"
 
         try:
             # Área do(s) lote(s)
