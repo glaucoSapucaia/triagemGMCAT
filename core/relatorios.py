@@ -176,13 +176,15 @@ def gerar_relatorio(
     )
 
     # Seções utilitárias
-    def adicionar_secao(titulo_secao, texto_secao=None):
-        elementos.append(HRFlowable(width="100%", thickness=1, color=colors.grey))
-        elementos.append(Spacer(1, 8))
-        elementos.append(Paragraph(titulo_secao, estilo_secao))
+    def adicionar_secao(titulo_secao=None, texto_secao=None):
+        if titulo_secao:
+            elementos.append(HRFlowable(width="100%", thickness=1, color=colors.grey))
+            elementos.append(Spacer(1, 8))
+            elementos.append(Paragraph(titulo_secao, estilo_secao))
         if texto_secao:
             elementos.append(Paragraph(texto_secao, estilo_texto))
-        elementos.append(Spacer(1, 12))
+        if titulo_secao and texto_secao:
+            elementos.append(Spacer(1, 12))
 
     # Prepara anexos (com renomeação no disco para nomes seguros)
     anexos_planta, anexos_siatu, anexos_projetos, anexos_sisctm, anexos_google = (
@@ -237,20 +239,58 @@ def gerar_relatorio(
     logger.info("Criando relatório PDF")
 
     # Seções
-    # 1. COL
-    logger.info("Adicionando seção 1: Certidão de Origem de Lote")
+    # 1. SIGEDE
+    logger.info("Adicionando seção 1: SIGEDE")
     adicionar_secao(
-        "1. Certidão de Origem de Lote",
-        "Verifique se a COL está na lista de Anexos SIATU. "
-        "<br/>Caso não a encontre, busque manualmente a certidão de origem de lote (COL). "
-        "<br/><b>Informação obtida no portal:</b> "
-        '<a href="https://siurbe.pbh.gov.br/#/solicitacao/CertidaoOrigemLote">'
-        '<font color="blue"><u>https://siurbe.pbh.gov.br/#/solicitacao/CertidaoOrigemLote</u></font></a>',
+        "1. SIGEDE - Busca por Protocolo e ICs vinculados",
+        "A presente seção será igual para todos os ICs vínculados ao mesmo protocolo.",
     )
+
+    # Busca arquivos .pdf e .png um nível acima (pasta protocolo)
+    arquivos_sigede = []
+    if pasta_anexos and os.path.exists(pasta_anexos):
+        pasta_pai = os.path.dirname(pasta_anexos)  # sobe 1 nível
+        count = 0
+        for arq in sorted(os.listdir(pasta_pai)):
+            if arq.lower().endswith((".pdf", ".png")):
+                count += 1
+                # Caminho relativo (../arquivo.pdf)
+                href = "../" + quote(
+                    arq,
+                    safe="._-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
+                )
+                link = Paragraph(
+                    f'<a href="{href}" color="blue">{arq}</a>', style_normal
+                )
+                arquivos_sigede.append([f"Anexo {count}", link])
+
+    if arquivos_sigede:
+        tabela_col = Table(
+            [["Anexo(s)", "Link"]] + arquivos_sigede, colWidths=[200, 300]
+        )
+        tabela_col.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.lightblue),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 10),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                ]
+            )
+        )
+        elementos.append(tabela_col)
+        elementos.append(Spacer(1, 12))
+    else:
+        elementos.append(
+            Paragraph("Nenhum registro encontrado no SIGEDE.", style_normal)
+        )
+        elementos.append(Spacer(1, 12))
 
     # 2. Planta Básica - Exercício Seguinte e/ou Recalculado e/ou Primeiro do Ano
     logger.info("Adicionando seção 2: Planta Básica")
-    if dados_planta:
+    if dados_planta and dados_planta["area_construida"] != "Não informado":
         chaves_pb = ["area_construida", "exercicio", "patrimonio", "endereco_imovel"]
         nomes_legiveis_pb = {
             "area_construida": "Área Construída Total",
@@ -303,9 +343,9 @@ def gerar_relatorio(
             "4. Dados SISCTM", dados_sisctm, chaves, nomes_legiveis, anexos_sisctm
         )
     else:
-        adicionar_secao(
-            "4. Dados SISCTM",
-            "Nenhum dado encontrado.",
+        gerar_tabela_secao(
+            "4. Dados SISCTM - IC NÃO ENCONTRADO",
+            anexos=anexos_sisctm,
         )
 
     # 5. Google Maps
@@ -335,13 +375,21 @@ def gerar_relatorio(
             "area_construida": "Área Construída",
         }
         dados_projeto_temp = dados_projeto if dados_projeto else {}
-        gerar_tabela_secao(
-            "6. Projeto, Alvará e Baixa de Construção",
-            dados_projeto_temp,
-            chaves_projeto,
-            nomes_legiveis_projeto,
-            anexos_projetos,
-        )
+
+        if dados_projeto_temp["tipo"] == "Não informado":
+            gerar_tabela_secao(
+                "6. Projeto, Alvará e Baixa de Construção",
+                anexos=anexos_projetos,
+            )
+
+        else:
+            gerar_tabela_secao(
+                "6. Projeto, Alvará e Baixa de Construção",
+                dados_projeto_temp,
+                chaves_projeto,
+                nomes_legiveis_projeto,
+                anexos_projetos,
+            )
     else:
         adicionar_secao(
             "6. Projeto, Alvará e Baixa de Construção",
@@ -350,7 +398,10 @@ def gerar_relatorio(
 
     # 7. Matrícula do Imóvel
     logger.info("Adicionando seção 7: Matrícula do Imóvel")
-    if dados_planta:
+    if (
+        dados_planta["matricula_registro"] != "Não informado"
+        or dados_planta["cartorio"] != "Não informado"
+    ):
         nomes_legiveis = {
             "matricula_registro": "Número da Matrícula",
             "cartorio": "Cartório",
@@ -364,7 +415,7 @@ def gerar_relatorio(
 
     # 8. Conclusão Parcial - Endereço + Áreas
     logger.info("Adicionando seção 8: Conclusão Parcial")
-    adicionar_secao("8. Conclusão Parcial")
+    adicionar_secao("8. Conclusão Parcial - Endereços e Áreas")
 
     # Compara endereços - SIATU vs CTMGEO
     endereco_siatu = dados_planta.get("endereco_imovel", "") if dados_planta else ""
@@ -422,36 +473,38 @@ def gerar_relatorio(
     a_pb = parse_area(dados_planta.get("area_construida") if dados_planta else None)
     a_urb = parse_area(dados_projeto.get("area_construida") if dados_projeto else None)
 
-    # Formata valores
-    area_pb = formatar_area(a_pb)
-    area_urbano = formatar_area(a_urb)
+    if a_pb or a_urb:
 
-    # Monta tabela apenas com os valores de área
-    data_area = [
-        ["Área Construída", ""],
-        ["Área PB", Paragraph(area_pb, style_normal)],
-        ["Área URBANO", Paragraph(area_urbano, style_normal)],
-    ]
+        # Formata valores
+        area_pb = formatar_area(a_pb)
+        area_urbano = formatar_area(a_urb)
 
-    tabela_area = Table(data_area, colWidths=[200, 300])
-    tabela_area.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.lightblue),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
-                ("FONTSIZE", (0, 0), (-1, -1), 10),
-                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-            ]
+        # Monta tabela apenas com os valores de área
+        data_area = [
+            ["Área Construída", ""],
+            ["Área PB", Paragraph(area_pb, style_normal)],
+            ["Área URBANO", Paragraph(area_urbano, style_normal)],
+        ]
+
+        tabela_area = Table(data_area, colWidths=[200, 300])
+        tabela_area.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.lightblue),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 10),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                ]
+            )
         )
-    )
-    elementos.append(tabela_area)
-    elementos.append(Spacer(1, 12))
+        elementos.append(tabela_area)
+        elementos.append(Spacer(1, 12))
 
     # Não cria tabelas se não há dados
-    if len(elementos) == 0 or (not endereco_siatu or not endereco_ctm):
-        adicionar_secao("8. Conclusão Parcial", "Não há dados para análise.")
+    if (not a_pb and not a_urb) and (not endereco_siatu or not endereco_ctm):
+        adicionar_secao(texto_secao="Não há dados para análise.")
 
     # Gera o PDF
     doc.build(elementos)

@@ -51,7 +51,7 @@ class GoogleMapsAuto:
                 EC.presence_of_element_located((By.ID, "searchboxinput"))
             )
             search_input.clear()
-            if self.endereco == "Não encontrado" or not self.endereco:
+            if self.endereco == "Não informado" or not self.endereco:
                 logger.warning("IC sem endereço, pulando navegação google maps.")
                 return
             search_input.send_keys(self.endereco)

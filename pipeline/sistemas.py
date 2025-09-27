@@ -1,6 +1,26 @@
 from pipeline.interface import SistemaAutomacao
-from core import SiatuAuto, UrbanoAuto, SisctmAuto, GoogleMapsAuto
+from core import SiatuAuto, UrbanoAuto, SisctmAuto, GoogleMapsAuto, SigedeAuto
 from utils import driver_context, logger
+
+
+class Sigede(SistemaAutomacao):
+    def executar(self, protocolo, credenciais, pasta_protocolo):
+        indices = []
+
+        with driver_context(pasta_protocolo) as driver:
+            sigede = SigedeAuto(
+                driver=driver,
+                url="https://cas.pbh.gov.br/cas/login?service=https%3A%2F%2Fsigede.pbh.gov.br%2Fsigede%2Flogin%2Fcas",
+                usuario=credenciais["usuario_sigede"],
+                senha=credenciais["senha_sigede"],
+                pasta_download=pasta_protocolo,
+            )
+
+            if sigede.acessar() and sigede.login() and sigede.navegar(protocolo):
+                indices = sigede.verificar_tabela()
+
+        logger.info(f"SIGEDE concluído para protocolo {protocolo}")
+        return indices
 
 
 class Siatu(SistemaAutomacao):

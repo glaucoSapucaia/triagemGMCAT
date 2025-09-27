@@ -4,14 +4,23 @@ from .sistemas import Siatu
 from .sistemas import Urbano
 from .sistemas import Sisctm
 from .sistemas import GoogleMaps
+from .sistemas import Sigede
 
 import os
 
 pasta_resultados = criar_pasta_resultados()
 
 
-def processar_indice(indice, credenciais):
-    pasta_indice = os.path.join(pasta_resultados, indice)
+def processar_protocolo(protocolo, credenciais):
+    pasta_protocolo = os.path.join(pasta_resultados, protocolo)
+    os.makedirs(pasta_protocolo, exist_ok=True)
+
+    indices = Sigede().executar(protocolo, credenciais, pasta_protocolo)
+    return indices
+
+
+def processar_indice(indice, credenciais, protocolo):
+    pasta_indice = os.path.join(pasta_resultados, protocolo, indice)
     os.makedirs(pasta_indice, exist_ok=True)
 
     dados_pb, anexos_count = Siatu().executar(indice, credenciais, pasta_indice)

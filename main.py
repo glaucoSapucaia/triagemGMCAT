@@ -3,7 +3,7 @@ import os
 # Remove logs do tensorflow (Selenium)
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"  # 0=all, 1=warn, 2=error, 3=fatal
 
-from pipeline import processar_indice, pasta_resultados
+from pipeline import processar_indice, pasta_resultados, processar_protocolo
 from utils import logger, abrir_pasta
 from gui import iniciar_interface
 
@@ -13,13 +13,23 @@ from datetime import datetime
 def main() -> None:
     """Função principal de execução."""
     try:
-        credenciais, indices = iniciar_interface()
+        credenciais, protocolos = iniciar_interface()
 
-        for indice in indices:
+        for protocolo in protocolos:
             try:
-                processar_indice(indice, credenciais)
+                indices = processar_protocolo(protocolo, credenciais)
             except Exception as e:
-                logger.error(f"Erro no processamento do índice {indice}: {e}")
+                logger.error(f"Erro no processamento do protocolo {protocolo}: {e}")
+
+            if indices:
+                for indice in indices:
+                    try:
+                        processar_indice(indice, credenciais, protocolo)
+                    except Exception as e:
+                        logger.error(f"Erro no processamento do índice {indice}: {e}")
+
+            else:
+                continue
 
         if os.path.exists(pasta_resultados):
             logger.info(f"Abrindo pasta de resultados: {pasta_resultados}")
