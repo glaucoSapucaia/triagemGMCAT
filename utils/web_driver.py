@@ -1,47 +1,79 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import WebDriverException, SessionNotCreatedException
 
 from contextlib import contextmanager
 import os
+import time
+import psutil
+
+from .logger import logger
 
 
-def criar_driver(pasta_indice=None, caminho_perfil=None, nome_perfil="Default"):
+def _kill_selenium_driver(driver):
     """
-    Configura e retorna um driver Chrome usando um perfil específico já criado.
-
-    :param pasta_indice: pasta onde salvar os downloads.
-    :param caminho_perfil: caminho para a pasta de perfis do Chrome.
-    :param nome_perfil: nome do perfil do Chrome - "Default".
+    Encerra apenas o Chrome iniciado pelo Selenium.
+    Não interfere em outros navegadores abertos.
     """
+    if not driver:
+        logger.info("Driver não existe, nada para encerrar.")
+        return
+
+    try:
+        # Tenta pegar PID do processo do Chrome
+        driver_pid = getattr(driver, "_chrome_pid", None)
+        if driver_pid is None:
+            driver_pid = driver.service.process.pid
+            driver._chrome_pid = driver_pid
+
+        parent = psutil.Process(driver_pid)
+
+        # Mata todos os processos filhos (renderers, etc)
+        for child in parent.children(recursive=True):
+            child.kill()
+            logger.info(f"Processo filho do Chrome encerrado: {child.pid}")
+
+        # Mata o processo principal do driver
+        parent.kill()
+        logger.info(f"Processo principal do Chrome encerrado: {parent.pid}")
+
+        time.sleep(1)
+
+    except psutil.NoSuchProcess:
+        logger.warning("O processo do Selenium já estava encerrado.")
+    except Exception as e:
+        logger.error(f"Erro ao tentar encerrar processo do Selenium: {e}")
+
+
+def criar_driver(
+    pasta_indice=None, caminho_perfil=None, nome_perfil="Default", add_config=None
+):
     chrome_options = Options()
-    # chrome_options.add_argument("--start-maximized")  # Inicia o Chrome maximizado
-    chrome_options.add_argument("--headless=new")  # Executa o Chrome em modo headless
+    chrome_options.add_argument("--headless=new")
+    # chrome_options.add_argument("--start-maximized")
     chrome_options.add_argument("--disable-popup-blocking")
     chrome_options.add_argument("--ignore-certificate-errors")
     chrome_options.add_argument("--disable-extensions")
-
-    # Remove logs do selenium
-    chrome_options.add_argument(
-        "--log-level=3"
-    )  # INFO=0, WARNING=1, LOG_ERROR=2, LOG_FATAL=3
+    chrome_options.add_argument("--log-level=3")
     chrome_options.add_argument("--silent")
     chrome_options.add_experimental_option("excludeSwitches", ["enable-logging"])
-
-    # Defini resolução para prints em tela cheia
     chrome_options.add_argument("--window-size=1920,1080")
 
-    # Usa um perfil já existente do Chrome
+    if add_config:
+        chrome_options.add_argument(
+            "--unsafely-treat-insecure-origin-as-secure=http://dividaativaonline.siatu.pbh.gov.br"
+        )
+
     if caminho_perfil:
         chrome_options.add_argument(f"user-data-dir={caminho_perfil}")
         chrome_options.add_argument(f"--profile-directory={nome_perfil}")
 
-    # Configurações de download automático
     if pasta_indice:
         prefs = {
             "download.default_directory": os.path.abspath(pasta_indice),
             "download.prompt_for_download": False,
             "download.directory_upgrade": True,
-            "plugins.always_open_pdf_externally": True,  # não abre PDF no Chrome, baixa direto
+            "plugins.always_open_pdf_externally": True,
         }
         chrome_options.add_experimental_option("prefs", prefs)
 
@@ -50,10 +82,43 @@ def criar_driver(pasta_indice=None, caminho_perfil=None, nome_perfil="Default"):
 
 
 @contextmanager
-def driver_context(pasta_indice, perfil=None, nome_perfil="Default"):
-    """Context manager para criar e fechar o driver automaticamente."""
-    driver = criar_driver(pasta_indice, caminho_perfil=perfil, nome_perfil=nome_perfil)
+def driver_context(pasta_indice, perfil=None, nome_perfil="Default", add_config=None):
+    driver = None
     try:
+        driver = criar_driver(
+            pasta_indice,
+            caminho_perfil=perfil,
+            nome_perfil=nome_perfil,
+            add_config=add_config,
+        )
         yield driver
+    except SessionNotCreatedException as e:
+        logger.error(f"Falha ao criar sessão do Chrome no driver_context: {e}")
+        logger.info("Encerrando driver Selenium de forma segura para retry.")
+        _kill_selenium_driver(driver)
+        raise
+    except WebDriverException as e:
+        logger.error(f"Erro WebDriver no driver_context: {e}")
+        logger.info("Encerrando driver Selenium de forma segura para retry.")
+        _kill_selenium_driver(driver)
+        raise
+    except Exception as e:
+        logger.error(f"Erro inesperado no driver_context: {e}")
+        logger.info("Encerrando driver Selenium de forma segura para retry.")
+        _kill_selenium_driver(driver)
+        raise
     finally:
-        driver.quit()
+        if driver:
+            try:
+                driver.quit()
+                logger.info(
+                    "Driver encerrado normalmente no finally do context manager."
+                )
+            except Exception as e:
+                logger.warning(f"driver.quit() falhou no finally: {e}")
+                _kill_selenium_driver(driver)
+        else:
+            logger.info(
+                "Driver não foi criado, mas executando encerramento seguro por precaução."
+            )
+            _kill_selenium_driver(driver)

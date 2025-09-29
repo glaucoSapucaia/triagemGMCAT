@@ -1,6 +1,6 @@
 from pipeline.interface import SistemaAutomacao
 from core import SiatuAuto, UrbanoAuto, SisctmAuto, GoogleMapsAuto, SigedeAuto
-from utils import driver_context, logger
+from utils import driver_context, logger, retry
 
 
 class Sigede(SistemaAutomacao):
@@ -24,23 +24,30 @@ class Sigede(SistemaAutomacao):
 
 
 class Siatu(SistemaAutomacao):
+
     def executar(self, indice, credenciais, pasta_indice):
         dados_pb = {}
         anexos_count = 0
+        add_config = True
 
-        perfil = r"C:\Users\glauc\AppData\Local\Google\Chrome\SeleniumProfile"
-        with driver_context(pasta_indice, perfil=perfil) as driver:
-            siatu = SiatuAuto(
-                driver=driver,
-                url="https://siatu-producao.pbh.gov.br/seguranca/login?service=https%3A%2F%2Fsiatu-producao.pbh.gov.br%2Faction%2Fmenu",
-                usuario=credenciais["usuario"],
-                senha=credenciais["senha"],
-                pasta_download=pasta_indice,
-            )
+        @retry(max_retries=4, delay=5, exceptions=(Exception,))
+        def fluxo_siatu():
+            with driver_context(pasta_indice, add_config=add_config) as driver:
+                siatu = SiatuAuto(
+                    driver=driver,
+                    url="https://siatu-producao.pbh.gov.br/seguranca/login?service=https%3A%2F%2Fsiatu-producao.pbh.gov.br%2Faction%2Fmenu",
+                    usuario=credenciais["usuario"],
+                    senha=credenciais["senha"],
+                    pasta_download=pasta_indice,
+                )
 
-            if siatu.acessar() and siatu.login() and siatu.navegar():
-                dados_pb = siatu.planta_basica(indice)
-                anexos_count = siatu.download_anexos(indice)
+                if siatu.acessar() and siatu.login() and siatu.navegar():
+                    return siatu.planta_basica(indice), siatu.download_anexos(indice)
+
+        try:
+            dados_pb, anexos_count = fluxo_siatu()
+        except Exception as e:
+            logger.error(f"Falha no fluxo do SIATU para índice {indice}: {e}")
 
         logger.info(f"Siatu concluído para índice {indice}")
         return dados_pb, anexos_count
@@ -87,11 +94,13 @@ class Sisctm(SistemaAutomacao):
 
 class GoogleMaps(SistemaAutomacao):
     def executar(self, indice, dados_sisctm, dados_pb, pasta_indice):
-        endereco = (
-            dados_sisctm.get("endereco_ctmgeo")
-            or dados_pb.get("endereco_imovel")
-            or "Não encontrado"
-        )
+        if dados_sisctm or dados_pb:
+            endereco = (
+                dados_sisctm.get("endereco_ctmgeo")
+                or dados_pb.get("endereco_imovel")
+                or "Não encontrado"
+            )
+
         with driver_context(pasta_indice) as driver:
             google = GoogleMapsAuto(
                 driver,

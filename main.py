@@ -16,15 +16,26 @@ def main() -> None:
         credenciais, protocolos = iniciar_interface()
 
         for protocolo in protocolos:
+            # Remove todos os "-" e "/"
+            # Protocolos não podem ter "-" e "/" para inserção no SIGEDE
+            protocolo_normalizado = (
+                protocolo.replace("-", "").replace("/", "").replace(".", "")
+            )
+
             try:
-                indices = processar_protocolo(protocolo, credenciais)
+                indices = processar_protocolo(protocolo_normalizado, credenciais)
             except Exception as e:
                 logger.error(f"Erro no processamento do protocolo {protocolo}: {e}")
 
             if indices:
                 for indice in indices:
+
+                    # Remove todos os "-"
+                    # Alguns ICs possuem "-" quando o valor é capturado do SIGEDE
+                    indice_normalizado = indice.replace("-", "")
+
                     try:
-                        processar_indice(indice, credenciais, protocolo)
+                        processar_indice(indice_normalizado, credenciais, protocolo)
                     except Exception as e:
                         logger.error(f"Erro no processamento do índice {indice}: {e}")
 

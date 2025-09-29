@@ -440,7 +440,9 @@ class SisctmAuto:
                         logger.info(f"{nome_item} já está ativo")
                     return item
                 except Exception as e:
-                    logger.info(f"Erro ao ativar item {nome_item}: {e}")
+                    logger.info(
+                        f"Erro ao ativar item {nome_item}: Camada {nome_item} não encontrada."
+                    )
 
             # --- IPTU CTM GEO ---
             iptu_item = ativar_item("IPTU CTM GEO")

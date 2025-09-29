@@ -227,6 +227,7 @@ def gerar_relatorio(
                 or "certidao_baixa" in arq.lower()
                 or "alvara_construcao" in arq.lower()
                 or "projeto" in arq.lower()
+                or "prancha" in arq.lower()
             ):
                 anexos_projetos.append(arq)
             elif "CTM" in arq:
@@ -344,7 +345,7 @@ def gerar_relatorio(
         )
     else:
         gerar_tabela_secao(
-            "4. Dados SISCTM - IC NÃO ENCONTRADO",
+            "4. Dados SISCTM - IC NÃO ENCONTRADO ou LOTE NÃO CENTRALIZADO",
             anexos=anexos_sisctm,
         )
 
@@ -396,11 +397,11 @@ def gerar_relatorio(
             "Nenhum dado encontrado.",
         )
 
-    # 7. Matrícula do Imóvel
     logger.info("Adicionando seção 7: Matrícula do Imóvel")
-    if (
-        dados_planta["matricula_registro"] != "Não informado"
-        or dados_planta["cartorio"] != "Não informado"
+
+    if isinstance(dados_planta, dict) and (
+        dados_planta.get("matricula_registro") != "Não informado"
+        or dados_planta.get("cartorio") != "Não informado"
     ):
         nomes_legiveis = {
             "matricula_registro": "Número da Matrícula",
@@ -473,7 +474,7 @@ def gerar_relatorio(
     a_pb = parse_area(dados_planta.get("area_construida") if dados_planta else None)
     a_urb = parse_area(dados_projeto.get("area_construida") if dados_projeto else None)
 
-    if a_pb or a_urb:
+    if a_pb is not None or a_urb is not None:
 
         # Formata valores
         area_pb = formatar_area(a_pb)

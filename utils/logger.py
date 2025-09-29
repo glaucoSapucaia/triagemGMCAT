@@ -19,7 +19,7 @@ file_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 console_handler = logging.StreamHandler()
 console_handler.setFormatter(console_formatter)
 
-file_handler = logging.FileHandler(log_file, encoding="utf-8")
+file_handler = logging.FileHandler(log_file, mode="w", encoding="utf-8")
 file_handler.setFormatter(file_formatter)
 
 # --- Logger central ---

@@ -214,10 +214,7 @@ class UrbanoAuto:
                     self.pasta_download, "Sem Alvara-Baixa.png"
                 )
                 self.driver.save_screenshot(screenshot_sem_doc)
-                logger.info(
-                    "Nenhum documento encontrado, print salvo em: %s",
-                    screenshot_sem_doc,
-                )
+                logger.info("Nenhum documento encontrado, captura de tela salva.")
 
                 # Clica em "Documentos Anexos"
                 try:

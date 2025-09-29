@@ -7,6 +7,7 @@ from .relatorio import (
     parse_area,
     formatar_area,
 )
+from .decorators import retry
 
 __all__ = [
     "logger",
@@ -17,5 +18,5 @@ __all__ = [
     "extrair_elementos_do_endereco_para_comparacao",
     "parse_area",
     "formatar_area",
-    "comparar_areas",
+    "retry",
 ]

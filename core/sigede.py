@@ -159,7 +159,11 @@ class SigedeAuto:
                     continue  # pula linhas que não têm todas as colunas
 
                 situacao = cols[4].text.strip()
-                if situacao == "Executando" or situacao == "Não Iniciado":
+                if (
+                    situacao == "Executando"
+                    or situacao == "Executando Siafim"
+                    or situacao == "Não Iniciado"
+                ):
                     # Clica no link dentro da coluna Situação
                     link = cols[4].find_element(By.TAG_NAME, "a")
                     self._click(link)
@@ -289,7 +293,7 @@ class SigedeAuto:
                 if len(indice) < 11:
                     raise ValueError(f"Índice inválido: {indice}")
 
-                indice_formatado = indice[0:10]
+                indice_formatado = indice[0:11]
                 logger.info("Índice formatado para pesquisa: %s", indice_formatado)
 
                 # Seleciona a opção 'Índice Cadastral' no select
@@ -331,7 +335,7 @@ class SigedeAuto:
                 self.driver.save_screenshot(screenshot_path)
                 logger.info("Print da tela salvo")
 
-                return True
+            return True
 
         except Exception as e:
             logger.error("Erro ao pesquisar índice cadastral: %s", e)

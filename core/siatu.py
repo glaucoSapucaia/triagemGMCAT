@@ -8,6 +8,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.webdriver.remote.remote_connection import RemoteConnection
 
 
 class SiatuAuto:
@@ -48,7 +49,7 @@ class SiatuAuto:
             return True
         except Exception as e:
             logger.error("Erro ao acessar o sistema: %s", e)
-            return False
+            raise
 
     def login(self):
         """
@@ -66,7 +67,7 @@ class SiatuAuto:
             return True
         except Exception as e:
             logger.error("Erro no login: %s", e)
-            return False
+            raise
 
     def navegar(self):
         """
@@ -100,7 +101,7 @@ class SiatuAuto:
             try:
                 self.driver.switch_to.default_content()
             except:
-                pass
+                raise
             return False
 
     def planta_basica(self, indice_cadastral: str):
@@ -123,6 +124,10 @@ class SiatuAuto:
             campo_exercicio = self.wait.until(
                 EC.presence_of_element_located((By.ID, "exercicio"))
             )
+
+            # Diminui timeout devido ao travamento do SIATU em algumas ocasiões
+            RemoteConnection.set_timeout(10)
+
             self._click(campo_exercicio)
             logger.info("Exercício clicado")
             time.sleep(2)
@@ -190,18 +195,22 @@ class SiatuAuto:
 
         except TimeoutException as e:
             logger.error("Timeout ao tentar gerar Planta Básica Resumida: %s", e)
-            return False
+            raise
         except NoSuchElementException as e:
             logger.error("Elemento não encontrado: %s", e)
-            return False
+            raise
         except Exception as e:
             logger.error("Erro inesperado em planta_basica: %s", e)
-            return False
+            raise
 
     def download_anexos(self, indice_cadastral: str):
         """
         Faz o download dos arquivos da seção anexos (apenas PDFs) do Siatu.
         """
+
+        # Normaliza timeout
+        RemoteConnection.set_timeout(120)
+
         try:
             logger.info(
                 "Iniciando download de anexos para índice: %s",
@@ -284,13 +293,13 @@ class SiatuAuto:
 
         except TimeoutException as e:
             logger.error("Timeout ao tentar baixar anexos: %s", e)
-            return False
+            raise
         except NoSuchElementException as e:
             logger.error("Elemento não encontrado: %s", e)
-            return False
+            raise
         except Exception as e:
             logger.error("Erro inesperado em download_anexos: %s", e)
-            return False
+            raise
 
     def _capturar_dados_imovel(self):
         """
