@@ -78,7 +78,7 @@ class SigedeAuto:
 
     def navegar(self, protocolo):
         """
-        Navega até o módulo SisCop e realiza uma busca pelo índice fornecido.
+        Navega até o módulo SisCop e realiza uma busca pelo protocolo fornecido.
 
         Parâmetros:
             protocolo (str): Valor a ser pesquisado no SisCop.
@@ -128,7 +128,7 @@ class SigedeAuto:
 
         - Salva um print da tela chamado 'pesquisa_protocolo.png'.
         - Se não houver registros, encerra o fluxo.
-        - Se houver, clica no elemento cuja coluna 'Situação' seja 'Não iniciado' ou 'Executando'.
+        - Se houver, clica no elemento cuja coluna 'Situação' seja 'Não iniciado', 'Executando Siafim' ou 'Executando'.
         """
         try:
             logger.info("Verificando registros na tabela")
@@ -152,11 +152,11 @@ class SigedeAuto:
                 logger.info("Nenhum processo encontrado. Encerrando fluxo.")
                 return False
 
-            # Itera pelas linhas para encontrar "Executando" na coluna Situação
+            # Itera pelas linhas para encontrar valor desejada na coluna Situação
             for row in rows:
                 cols = row.find_elements(By.TAG_NAME, "td")
                 if len(cols) < 5:
-                    continue  # pula linhas que não têm todas as colunas
+                    continue
 
                 situacao = cols[4].text.strip()
                 if (
@@ -167,7 +167,7 @@ class SigedeAuto:
                     # Clica no link dentro da coluna Situação
                     link = cols[4].find_element(By.TAG_NAME, "a")
                     self._click(link)
-                    time.sleep(5)  # Espera a próxima página carregar
+                    time.sleep(5)
                     logger.info(
                         f"Processo com situação ({situacao}) encontrado e clicado"
                     )
@@ -239,7 +239,7 @@ class SigedeAuto:
                 )
             )
             self._click(aba)
-            time.sleep(1)  # pequena espera para aba carregar
+            time.sleep(1)
 
             # Localiza a tabela dentro da aba
             tab_panel = self.wait.until(
@@ -265,6 +265,9 @@ class SigedeAuto:
             return []
 
     def _busca_por_indices(self, indices):
+        """
+        Realiza pesquisa dos ICs vinculados ao protocolo.
+        """
         try:
 
             for indice in indices:
@@ -272,7 +275,7 @@ class SigedeAuto:
                     f"Buscando índice: {indice} no Sigede (Zona, Quadra e Lote)"
                 )
 
-                # 1. Clicar no elemento SisCop
+                # Clica no elemento SisCop
                 siscop_btn = self.wait.until(
                     EC.element_to_be_clickable(
                         (
@@ -284,7 +287,7 @@ class SigedeAuto:
                 self._click(siscop_btn)
                 logger.info("Acessando SisCop")
 
-                time.sleep(3)  # Pequena espera para carregar a página do SisCop
+                time.sleep(3)
 
                 # Formata o índice
                 indice = (
@@ -315,7 +318,7 @@ class SigedeAuto:
                 search_input.clear()
                 search_input.send_keys(indice_formatado)
 
-                time.sleep(1)  # pequena pausa antes de pesquisar
+                time.sleep(1)
 
                 # Clica no botão pesquisar
                 logger.info("Clicando no botão pesquisar")
@@ -326,7 +329,7 @@ class SigedeAuto:
                 )
                 self._click(pesquisar_btn)
 
-                time.sleep(2)  # espera a tabela atualizar
+                time.sleep(2)
 
                 # Salva print da tela
                 screenshot_path = os.path.join(
@@ -351,7 +354,7 @@ class SigedeAuto:
         temporarios = (".crdownload", ".part", ".tmp")
         inicio = time.time()
 
-        # Mapear arquivos existentes e seus tamanhos
+        # Mapeia arquivos existentes e seus tamanhos
         try:
             arquivos_anteriores = {
                 f: os.path.getsize(os.path.join(pasta, f)) for f in os.listdir(pasta)
@@ -370,7 +373,7 @@ class SigedeAuto:
 
             for f, tamanho in arquivos_atuais.items():
                 if f.endswith(temporarios):
-                    continue  # ignora arquivos temporários
+                    continue
                 sanitized = self._sanitize_filename(f)
                 # Detecta se é novo ou mudou de tamanho
                 if (

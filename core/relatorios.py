@@ -29,7 +29,7 @@ def gerar_relatorio(
     anexos_count=None,
     projetos_count=None,
     pasta_anexos=None,
-    prps_trabalhador="Prps não informado",
+    prps_trabalhador="Pr não informado",
     nome_pdf="Relatorio de triagem.pdf",
     dados_planta=None,
     dados_projeto=None,
@@ -250,7 +250,7 @@ def gerar_relatorio(
     # Busca arquivos .pdf e .png um nível acima (pasta protocolo)
     arquivos_sigede = []
     if pasta_anexos and os.path.exists(pasta_anexos):
-        pasta_pai = os.path.dirname(pasta_anexos)  # sobe 1 nível
+        pasta_pai = os.path.dirname(pasta_anexos)
         count = 0
         for arq in sorted(os.listdir(pasta_pai)):
             if arq.lower().endswith((".pdf", ".png")):
@@ -397,6 +397,7 @@ def gerar_relatorio(
             "Nenhum dado encontrado.",
         )
 
+    # 7. Matrícula do Imóvel
     logger.info("Adicionando seção 7: Matrícula do Imóvel")
 
     if isinstance(dados_planta, dict) and (
@@ -418,7 +419,7 @@ def gerar_relatorio(
     logger.info("Adicionando seção 8: Conclusão Parcial")
     adicionar_secao("8. Conclusão Parcial - Endereços e Áreas")
 
-    # Compara endereços - SIATU vs CTMGEO
+    # Compara endereços - SIATU vs IPTU CTMGEO
     endereco_siatu = dados_planta.get("endereco_imovel", "") if dados_planta else ""
     endereco_ctm = dados_sisctm.get("endereco_ctmgeo", "") if dados_sisctm else ""
 
@@ -475,7 +476,6 @@ def gerar_relatorio(
     a_urb = parse_area(dados_projeto.get("area_construida") if dados_projeto else None)
 
     if a_pb is not None or a_urb is not None:
-
         # Formata valores
         area_pb = formatar_area(a_pb)
         area_urbano = formatar_area(a_urb)

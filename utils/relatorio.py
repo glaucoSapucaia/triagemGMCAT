@@ -49,6 +49,9 @@ def limpar_area(valor):
 
 
 def parse_area(valor):
+    """
+    Valida valor de área
+    """
     if not valor or str(valor).strip().lower() in ["não informado", ""]:
         return None
     try:
@@ -59,6 +62,9 @@ def parse_area(valor):
 
 
 def formatar_area(valor):
+    """
+    Formata valor de área
+    """
     if valor is None:
         return "Não informado"
     try:

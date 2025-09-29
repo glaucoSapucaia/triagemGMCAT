@@ -1,5 +1,7 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 from selenium.common.exceptions import WebDriverException, SessionNotCreatedException
 
 from contextlib import contextmanager
@@ -48,9 +50,15 @@ def _kill_selenium_driver(driver):
 def criar_driver(
     pasta_indice=None, caminho_perfil=None, nome_perfil="Default", add_config=None
 ):
+    """
+    Criação de webdriver chrome.
+
+    Parâmetros:
+    add_config: flag experimental HTTP.
+    """
     chrome_options = Options()
-    chrome_options.add_argument("--headless=new")
-    # chrome_options.add_argument("--start-maximized")
+    chrome_options.add_argument("--headless=new")  # Executar em segundo plano.
+    # chrome_options.add_argument("--start-maximized")  # Executar navegador maximizdo.
     chrome_options.add_argument("--disable-popup-blocking")
     chrome_options.add_argument("--ignore-certificate-errors")
     chrome_options.add_argument("--disable-extensions")
@@ -59,6 +67,7 @@ def criar_driver(
     chrome_options.add_experimental_option("excludeSwitches", ["enable-logging"])
     chrome_options.add_argument("--window-size=1920,1080")
 
+    # Flag experimental
     if add_config:
         chrome_options.add_argument(
             "--unsafely-treat-insecure-origin-as-secure=http://dividaativaonline.siatu.pbh.gov.br"
@@ -77,12 +86,18 @@ def criar_driver(
         }
         chrome_options.add_experimental_option("prefs", prefs)
 
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=chrome_options)
+
     driver = webdriver.Chrome(options=chrome_options)
     return driver
 
 
 @contextmanager
 def driver_context(pasta_indice, perfil=None, nome_perfil="Default", add_config=None):
+    """
+    Cria, usa e finaliza webdriver.
+    """
     driver = None
     try:
         driver = criar_driver(

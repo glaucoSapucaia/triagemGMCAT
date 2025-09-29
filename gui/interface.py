@@ -44,7 +44,7 @@ def iniciar_interface():
         entry_senha_sigede = tk.Entry(root, show="*")
         entry_senha_sigede.grid(row=1, column=1)
 
-        # Credenciais principais
+        # Credenciais SIATU
         tk.Label(root, text="Usuário SIATU:").grid(row=2, column=0)
         entry_usuario = tk.Entry(root)
         entry_usuario.grid(row=2, column=1)

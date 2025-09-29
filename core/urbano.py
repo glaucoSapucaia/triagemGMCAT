@@ -162,9 +162,7 @@ class UrbanoAuto:
                 primeiro_projeto = linhas[0].find_element(By.TAG_NAME, "a")
                 self._click(primeiro_projeto)
                 logger.info("Clicado no primeiro projeto da lista")
-                time.sleep(
-                    20
-                )  # Aguarda carregar a página do projeto (geralmente demora)
+                time.sleep(20)
 
             except NoSuchElementException:
                 logger.info("Projetos não encontrados na pesquisa")
@@ -207,9 +205,9 @@ class UrbanoAuto:
                 )
                 return qtd_projetos, dados_projeto
 
-            # Se nenhum documento encontrado, salvar print e acessa "Documentos Anexos"
+            # Se nenhum documento encontrado, salva print e acessa "Documentos Anexos"
             if not certidao and not alvara:
-                time.sleep(10)  # Espera extra para garantir carregamento
+                time.sleep(10)
                 screenshot_sem_doc = os.path.join(
                     self.pasta_download, "Sem Alvara-Baixa.png"
                 )
@@ -268,7 +266,7 @@ class UrbanoAuto:
                     try:
                         primeiro_arquivo.click()
                     except Exception:
-                        # fallback se o Selenium não conseguir clicar
+                        # Fallback se o Selenium não conseguir clicar
                         self.driver.execute_script(
                             "arguments[0].click();", primeiro_arquivo
                         )
@@ -294,6 +292,7 @@ class UrbanoAuto:
         Captura os dados do projeto:
         - Tipo: nome do arquivo baixado
         - Área do(s) lote(s)
+        - Área construida
         Caso algum campo não seja encontrado, retorna 'Não informado'.
         """
         dados = {}
@@ -317,7 +316,6 @@ class UrbanoAuto:
             area_construida_elem = self.driver.find_element(
                 By.ID, "pb_area_total_visualizacao"
             )
-            # Pega apenas o texto do span (ex.: "72,93 m²")
             area_construida_span = area_construida_elem.find_element(
                 By.TAG_NAME, "span"
             )

@@ -60,7 +60,7 @@ class SisctmAuto:
             logger.info("Iniciando login no SISCTM")
             self.driver.get(self.url)
 
-            time.sleep(3)  # Espera inicial para o Vue renderizar
+            time.sleep(3)
 
             # Espera o formulário completo aparecer
             self.wait.until(
@@ -90,7 +90,7 @@ class SisctmAuto:
             self.driver.execute_script("arguments[0].click();", btn_login)
             logger.info("Login realizado com sucesso")
 
-            time.sleep(10)  # Espera para garantir que o login foi processado
+            time.sleep(10)
 
             return True
 
@@ -345,6 +345,9 @@ class SisctmAuto:
             return False
 
     def _prints_aereo(self) -> None:
+        """
+        Realiza captura de tela.
+        """
         # Print AEREO CTM
         time.sleep(15)
         screenshot_path = os.path.join(self.pasta_download, "CTM_Aereo.png")
@@ -364,7 +367,7 @@ class SisctmAuto:
         logger.info("Elemento 'BHMap' clicado")
         time.sleep(2)
 
-        # Seleciona a ortofoto 2025 (ou 2015 no seu exemplo)
+        # Seleciona a ortofoto 2015
         elemento_ortofoto = self.wait.until(
             EC.element_to_be_clickable(
                 (
@@ -385,21 +388,23 @@ class SisctmAuto:
         return
 
     def _clique_centro_mapa(self):
+        """
+        Clica no centro do mapa (elemento canva).
+        """
         try:
             logger.info("Iniciando tentativa de clique no centro do mapa")
 
-            # tenta localizar o viewport do mapa
+            # Tenta localizar o viewport do mapa
             viewport = self.driver.find_element(By.CSS_SELECTOR, "#olmap .ol-viewport")
             logger.info(
                 f"Viewport encontrado: tamanho {viewport.size['width']}x{viewport.size['height']}"
             )
 
-            # cria a ação de mover e clicar
+            # Cria a ação de mover e clicar
             action = ActionChains(self.driver)
             action.move_to_element(viewport).click().perform()
             logger.info("Clique no centro do mapa realizado")
 
-            # espera o mapa processar o clique (carregamento de layers ou overlays)
             time.sleep(5)
 
         except NoSuchElementException as e:
@@ -410,6 +415,9 @@ class SisctmAuto:
             logger.error(f"Erro inesperado ao clicar no mapa: {e}")
 
     def capturar_areas(self):
+        """
+        Captura dados das tabelas à esqueda da página.
+        """
         resultado = {}
         try:
             logger.info("Iniciando captura de áreas do painel lateral")
@@ -444,7 +452,7 @@ class SisctmAuto:
                         f"Erro ao ativar item {nome_item}: Camada {nome_item} não encontrada."
                     )
 
-            # --- IPTU CTM GEO ---
+            # IPTU CTM GEO
             iptu_item = ativar_item("IPTU CTM GEO")
             time.sleep(2)
             # Aguarda a linha com "ÁREA" existir
@@ -516,10 +524,10 @@ class SisctmAuto:
                 tabela = lote_cp_item.find_element(By.TAG_NAME, "table")
                 linhas = tabela.find_elements(By.TAG_NAME, "tr")
 
-                # Pega a sexta linha (índice 5, porque lista em Python é 0-based)
+                # Captura a sexta linha e segunda coluna
                 linha_area = linhas[5]
                 colunas = linha_area.find_elements(By.TAG_NAME, "td")
-                valor = colunas[1].text.strip()  # segunda coluna
+                valor = colunas[1].text.strip()
                 resultado["lote_cp_ativo_area_informada"] = valor
             except Exception as e:
                 logger.warning(f"Não foi possível capturar área Lote CP - ATIVO: {e}")

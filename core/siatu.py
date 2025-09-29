@@ -244,7 +244,7 @@ class SiatuAuto:
             qtd_anexos = 0
 
             for i, _ in enumerate(anexos_pdf, start=1):
-                # Refetch para evitar StaleElementReference
+                # Refetch para evitar StaleElementReference (perda da referência dos dados)
                 anexos_pdf_refetch = self.driver.find_elements(
                     By.XPATH,
                     "//table[.//b[text()='Imagens anexadas']]/preceding::table[1]//tr/td[1]/a"
@@ -303,7 +303,7 @@ class SiatuAuto:
 
     def _capturar_dados_imovel(self):
         """
-        Captura os dados do imóvel: Área Construída, Exercício, Tipo de Uso,
+        Captura os dados do imóvel: Área Construída, Exercício, Patrimônio,
         Matrícula de Registro e Cartório.
         Caso não existam, retorna 'Não informado' (texto).
         """
@@ -321,7 +321,7 @@ class SiatuAuto:
         except Exception:
             dados["exercicio"] = "Não informado"
 
-        # PATRIMÔNIO (substituindo o tipo de uso)
+        # PATRIMÔNIO
         try:
             patrimonio_elem = self.driver.find_element(
                 By.XPATH,
@@ -350,9 +350,9 @@ class SiatuAuto:
             areas = []
             for elem in area_elems:
                 txt = elem.text.strip()
-                if txt:  # ignora células vazias
+                if txt:
                     try:
-                        areas.append(float(txt.replace(",", ".")))  # caso use vírgula
+                        areas.append(float(txt.replace(",", ".")))
                     except ValueError:
                         pass
 
@@ -386,7 +386,7 @@ class SiatuAuto:
             )
             dados["cartorio"] = (
                 cartorio_elem.text.strip()
-                if cartorio_elem.text.strip() not in [None, "", "-"]  # trata o valor
+                if cartorio_elem.text.strip() not in [None, "", "-"]
                 else "Não informado"
             )
         except Exception:
@@ -404,7 +404,7 @@ class SiatuAuto:
         temporarios = (".crdownload", ".part", ".tmp")
         inicio = time.time()
 
-        # Mapear arquivos existentes e seus tamanhos
+        # Mapeia arquivos existentes e seus tamanhos
         try:
             arquivos_anteriores = {
                 f: os.path.getsize(os.path.join(pasta, f)) for f in os.listdir(pasta)
@@ -423,7 +423,7 @@ class SiatuAuto:
 
             for f, tamanho in arquivos_atuais.items():
                 if f.endswith(temporarios):
-                    continue  # ignora arquivos temporários
+                    continue
                 sanitized = self._sanitize_filename(f)
                 # Detecta se é novo ou mudou de tamanho
                 if (
@@ -452,7 +452,7 @@ class SiatuAuto:
             time.sleep(2)
 
             # Aumenta o zoom antes do print
-            self.driver.execute_script("document.body.style.zoom='200%'")
+            self.driver.execute_script("document.body.style.zoom='150%'")
             time.sleep(1)
 
             # Print da tela
