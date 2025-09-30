@@ -1,15 +1,17 @@
 # Ambiente
 venv/
 __pycache__/
+dist/
+build/
 
 # Resultados gerais
 Resultados*/
 
 # Logs
-logs.*
+Detalhes da Triagem.*
 
 # Script que verifica indices duplicaodos
 indices_duplicados.py
 
-# Pasta criada na execução do ubuntu com confiurações windows.
-C:*
+*.spec
+*.ico

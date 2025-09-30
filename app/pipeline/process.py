@@ -1,4 +1,4 @@
-from utils import criar_pasta_resultados, logger
+from utils import logger
 from core import gerar_relatorio
 from .sistemas import Siatu
 from .sistemas import Urbano
@@ -8,10 +8,8 @@ from .sistemas import Sigede
 
 import os
 
-pasta_resultados = criar_pasta_resultados()
 
-
-def processar_protocolo(protocolo, credenciais):
+def processar_protocolo(protocolo, credenciais, pasta_resultados):
     """
     Execução do módulo SIGEDE (Protocolos)
     Captura indices vinculados ao protocolo
@@ -24,7 +22,7 @@ def processar_protocolo(protocolo, credenciais):
     return indices
 
 
-def processar_indice(indice, credenciais, protocolo):
+def processar_indice(indice, credenciais, protocolo, pasta_resultados):
     """
     Execução dos módulos SIATU, URBANO e SISCTM (IC)
     Execução do módulo Google Maps (Endereço)

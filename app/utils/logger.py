@@ -1,9 +1,17 @@
+import sys
 from pathlib import Path
 import logging
 
-ROOT = Path(__file__).parent.parent
+# Detecta se está rodando via PyInstaller
+if getattr(sys, "frozen", False):
+    ROOT = Path.cwd()  # pasta do PyInstaller
+else:
+    ROOT = Path(__file__).parent.parent.parent
 
-LOG_FILE = "logs.txt"
+# Ou, se você quer criar o log junto do executável:
+# ROOT = Path.cwd()
+
+LOG_FILE = "Detalhes da Triagem.txt"
 
 # Cria pasta do log se não existir
 log_file = ROOT / LOG_FILE
